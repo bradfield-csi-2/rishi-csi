@@ -1,5 +1,7 @@
 package vm
 
+import "fmt"
+
 const (
 	Load  = 0x01
 	Store = 0x02
@@ -31,13 +33,26 @@ func compute(memory []byte) {
 
 	// Keep looping, like a physical computer's clock
 	for {
+		op := memory[registers[0]]
+		arg1 := memory[registers[0]+1]
+		arg2 := memory[registers[0]+2]
 
-		// op := TODO // fetch the opcode
+		// decode and execute
+		switch op {
+		case Load:
+			registers[arg1] = memory[arg2]
+		case Store:
+			memory[arg2] = registers[arg1]
+		case Add:
+			registers[arg1] = registers[arg1] + registers[arg2]
+		case Sub:
+			registers[arg1] = registers[arg1] - registers[arg2]
+		case Halt:
+			return
+		default:
+			panic(fmt.Errorf("Unknown op code: %x", op))
+		}
 
-		// // decode and execute
-		// switch op {
-		// case Load:
-		//   TODO
-		// ...
+		registers[0] += 3 // Increment PC to next instruction
 	}
 }
