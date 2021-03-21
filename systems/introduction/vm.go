@@ -30,9 +30,12 @@ const (
 func compute(memory []byte) {
 
 	registers := [3]byte{8, 0, 0} // PC, R1 and R2
+	var pcincr byte               // Amount to increment the PC each cycle
 
 	// Keep looping, like a physical computer's clock
 	for {
+		pcincr = 3 // Default instruction length is three bytes
+
 		op := memory[registers[0]]
 		arg1 := memory[registers[0]+1]
 		arg2 := memory[registers[0]+2]
@@ -49,10 +52,21 @@ func compute(memory []byte) {
 			registers[arg1] = registers[arg1] - registers[arg2]
 		case Halt:
 			return
+		case Addi:
+			registers[arg1] = registers[arg1] + arg2
+		case Subi:
+			registers[arg1] = registers[arg1] - arg2
+		case Jump:
+			pcincr = 0 // Don't increment the PC since we're setting it below
+			registers[0] = arg1
+		case Beqz:
+			if registers[arg1] == 0 {
+				pcincr += arg2
+			}
 		default:
 			panic(fmt.Errorf("Unknown op code: %x", op))
 		}
 
-		registers[0] += 3 // Increment PC to next instruction
+		registers[0] += pcincr // Increment PC to next instruction
 	}
 }
