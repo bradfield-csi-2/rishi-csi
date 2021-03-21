@@ -123,6 +123,18 @@ halt`,
 	},
 }
 
+var memProtectionTest = vmTest{
+	// Support memory protection
+	name: "Memory protection",
+	asm: `
+load r1 1
+store r1 8
+halt`,
+	cases: []vmCase{
+		{0, 0, 0},
+	},
+}
+
 func TestCompute(t *testing.T) {
 	for _, test := range mainTests {
 		t.Run(test.name, func(t *testing.T) { testCompute(t, test) })
@@ -134,6 +146,16 @@ func TestCompute(t *testing.T) {
 			t.Run(test.name, func(t *testing.T) { testCompute(t, test) })
 		}
 	}
+}
+
+func TestMemProtection(t *testing.T) {
+	defer func() {
+		if r := recover(); r == nil {
+			t.Errorf("Did not panic when attempting to write in protected memory.")
+		}
+	}()
+
+	testCompute(t, memProtectionTest)
 }
 
 // Given some assembly code and test cases, construct a program

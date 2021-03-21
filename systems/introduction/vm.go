@@ -45,6 +45,10 @@ func compute(memory []byte) {
 		case Load:
 			registers[arg1] = memory[arg2]
 		case Store:
+			if arg2 >= 8 {
+				// We don't want to write in the instructions portion of memory
+				panic(fmt.Errorf("Segmentation fault: Can't write to location 0x%x", arg2))
+			}
 			memory[arg2] = registers[arg1]
 		case Add:
 			registers[arg1] = registers[arg1] + registers[arg2]
