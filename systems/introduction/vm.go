@@ -18,6 +18,10 @@ const (
 	Beqz = 0x08
 )
 
+// Mark where the instructions portion of memory starts
+// All locations >= to this value will hold instructions
+const InstructionStartLoc = 8
+
 // Given a 256 byte array of "memory", run the stored program
 // to completion, modifying the data in place to reflect the result
 //
@@ -27,7 +31,7 @@ const (
 // __ __ __ __ __ __ __ __ __ __ __ __ __ __ __ __ ... __
 // ^==DATA===============^ ^==INSTRUCTIONS==============^
 //
-func compute(memory []byte) {
+func compute(memory []byte) error {
 
 	registers := [3]byte{8, 0, 0} // PC, R1 and R2
 	var pcincr byte               // Amount to increment the PC each cycle
@@ -37,25 +41,31 @@ func compute(memory []byte) {
 		pcincr = 3 // Default instruction length is three bytes
 
 		op := memory[registers[0]]
-		arg1 := memory[registers[0]+1]
-		arg2 := memory[registers[0]+2]
+		if op == Halt {
+			return nil
+		}
+
+		var arg1, arg2 byte
+		arg1 = memory[registers[0]+1]
+		if op != Jump {
+			arg2 = memory[registers[0]+2]
+		}
 
 		// decode and execute
 		switch op {
 		case Load:
 			registers[arg1] = memory[arg2]
 		case Store:
-			if arg2 >= 8 {
+			if arg2 >= InstructionStartLoc {
 				// We don't want to write in the instructions portion of memory
-				panic(fmt.Errorf("Segmentation fault: Can't write to location 0x%x", arg2))
+				return fmt.Errorf("Segmentation fault: Can't write to location 0x%x", arg2)
+
 			}
 			memory[arg2] = registers[arg1]
 		case Add:
 			registers[arg1] = registers[arg1] + registers[arg2]
 		case Sub:
 			registers[arg1] = registers[arg1] - registers[arg2]
-		case Halt:
-			return
 		case Addi:
 			registers[arg1] = registers[arg1] + arg2
 		case Subi:
@@ -68,7 +78,7 @@ func compute(memory []byte) {
 				pcincr += arg2
 			}
 		default:
-			panic(fmt.Errorf("Unknown op code: %x", op))
+			return fmt.Errorf("Unknown op code: %x", op)
 		}
 
 		registers[0] += pcincr // Increment PC to next instruction

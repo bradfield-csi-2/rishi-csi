@@ -121,17 +121,16 @@ halt`,
 			{10, 0, 55},
 		},
 	},
-}
-
-var memProtectionTest = vmTest{
 	// Support memory protection
-	name: "Memory protection",
-	asm: `
-load r1 1
-store r1 8
-halt`,
-	cases: []vmCase{
-		{0, 0, 0},
+	{
+		name: "Memory protection",
+		asm: `
+	load r1 1
+	store r1 8
+	halt`,
+		cases: []vmCase{
+			{0, 0, 0},
+		},
 	},
 }
 
@@ -148,16 +147,6 @@ func TestCompute(t *testing.T) {
 	}
 }
 
-func TestMemProtection(t *testing.T) {
-	defer func() {
-		if r := recover(); r == nil {
-			t.Errorf("Did not panic when attempting to write in protected memory.")
-		}
-	}()
-
-	testCompute(t, memProtectionTest)
-}
-
 // Given some assembly code and test cases, construct a program
 // according to the required memory structure, and run in each
 // case through the virtual machine
@@ -170,7 +159,10 @@ func testCompute(t *testing.T, test vmTest) {
 		memory[1] = c.x
 		memory[2] = c.y
 
-		compute(memory)
+		err := compute(memory)
+		if err == nil && test.name == "Memory protection" {
+			t.Errorf("Writing to protected memory did not return an error, but should have.")
+		}
 
 		actual := memory[0]
 		if actual != c.out {
