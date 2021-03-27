@@ -1,10 +1,13 @@
+# Binary Encodings Prework
+
 ## 1. Hexadecimal
 
 ### 1.1 Simple Conversion
-
+```
 9   => 0x9
 136 => 0x88
 247 => 0xf7
+```
 
 ### 1.2 CSS Colors
 
@@ -16,13 +19,15 @@ For eight bits each of red, green, and blue, we can represent 256*256*256 =
 For a 17-byte file, I would expect 34 hexadecimal characters to represent it.
 
 The first five bytes in binary are:
+```
 68       65       6c       6c       6f
 01101000 01100101 01101100 01101100 01101111
+```
 
 ## 2. Integers
 
 ### 2.1 Basic Conversion
-
+```
 4   => 0b100
 65  => 0b1000001
 105 => 0b1101001
@@ -32,19 +37,19 @@ The first five bytes in binary are:
 0b11      => 3
 0b1101100 => 108
 0b1010101 => 85
-
+```
 ### 2.2 Unsigned Binary Addition
-
+```
   11111111
 + 00001101
   --------
  100001100
-
+```
  In decimal, this is 255 + 13 = 268. When you only have eight-bit registers, the
  most significant bit will "overflow" and you'll be left with 0b00001100, or 12.
 
 ### 2.3 Two’s Complement Conversion
-
+```
 127  => 0b01111111
 -128 => 0b10000000
 -1   => 0b11111111
@@ -53,14 +58,14 @@ The first five bytes in binary are:
 
 0b10000011 => -125
 0b11000100 => -60
-
+```
 ### 2.4  Addition of Two’s Complement Signed Integers
-
+```
   01111111
 + 10000000
   --------
   11111111
-
+```
 This is 127 + -128 in decimal, so -1 as a result makes sense.
 
 One can negate a number in two's complement by flipping all the bits and adding
@@ -82,7 +87,6 @@ because it means we added two positive numbers and got a negative. Similarly, if
 there is no carry in but a carry out, it means we've added two negatives and
 gotten a positive number.
 
-
 ## 3. Byte ordering
 
 ### 3.1 It’s over 9000!
@@ -99,10 +103,13 @@ $ xxd -e -g 1 tcpheader
 00000000: af 00 bc 06 44 1e 73 68 ef f2 a0 02 81 ff 56 00  ....D.sh......V.
 ```
 
+This breaks down into:
+```
 Source port:            af 00       => 44800
 Destination port:       bc 06       => 48134
 Sequence number:        44 1e 73 68 => 1142846312
 Acknowledgement number: ef f2 a0 02 => 4025655298
+```
 
 The data offset is 0x8, or just 8 decimal. This is the number of 32-bit words in
 the header, which is 256 bits, or 32 bytes total. Since the minimum number of
@@ -126,6 +133,7 @@ xxd -p -s 22 -l 4 image2.bmp # 40000000 => 64 px
 ```
 
 image1: 24x48
+
 image2: 32x64
 
 At offset 28 is a two-byte value giving the bits per pixel. For both images this
@@ -153,7 +161,7 @@ the colors with 24 bits/pixel is BGR and the bytes repeat as 0x0000ff.
 ## 5. IEEE Floating Point
 
 ### 5.1 Deconstruction
-
+```
 0 10000100 01010100000000000000000
 - -------- -----------------------
 S Exponent Mantissa
@@ -161,7 +169,7 @@ S Exponent Mantissa
 sign = positive
 exponent = 132 - 127 = 5
 mantissa = 1 + (2^-2 + 2^-4 + 2^-6) = 1.328125
-
+```
 1.328125 * 2^5 = 42.5
 
 With the largest fixed exponent, the smallest magnitude change possible is
@@ -244,11 +252,11 @@ This matches the pattern of UTF-8 encoding with 11110xxx in the first byte and
 
 Given that the multi-byte character is UTF-8 encoded, we can pull out the code
 point and look it up:
-
+```
 11110000 10011111 10011000 10000000
      ---   ------   ------   ------
 0 0001 1111 0110 0000 0000
-
+```
 This is hex: 0x1f600
 
 And looking that code point up in the
