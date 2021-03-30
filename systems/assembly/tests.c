@@ -29,7 +29,7 @@ void test_pangram_alpha(void) {
   TEST_ASSERT_TRUE(pangram("abcdefghijklmnopqrstuvwxyz"));
 }
 void test_pangram_punctuated(void) {
-  TEST_ASSERT_TRUE(pangram("abc, def! ghi... jkl25; mnopqrstuvwxyz"));
+  TEST_ASSERT_TRUE(pangram("abc, def! ghi... jkl25; {} @mnopqrstuvwxyz"));
 }
 void test_pangram_incomplete(void) {
   TEST_ASSERT_FALSE(pangram("abcdefghijklmnopqrstuvwxy"));
