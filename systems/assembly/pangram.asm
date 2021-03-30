@@ -16,10 +16,8 @@ check:
   cmp rcx, 27        ; we only care about 26 letters
   jnl check          ; skip this char if it is not at most 26
 
-  dec rcx            ; decrement rcx so 'a' shifts 0, 'b' shifts 1, ...
-  mov r10, 1         ; the placeholder that will be shifted
-  shl r10, cl        ; shift left by cl (low 8 bits of rcx); 'h' gives 10000000
-  or r8, r10         ; r8 is our "seen" array, so set the bit for that letter
+  dec rcx            ; decrement rcx so 'a' offsets 0, 'b' offsets 1, ...
+  bts r8, rcx        ; set the bit in the "seen" array to the offset in rcx
 
   cmp r8, 0x03ffffff ; check if the lowest 26 bits of the seen array are all 1
   jne check          ; jump and keep checking if not all 1s seen
