@@ -9,11 +9,9 @@ check:
   je    done            ; jump to return if null byte
   inc rdi               ; move to the next character in the string
 
-  xor rcx, 1000000b  ; set the 7th bit to 1 if < 65; we will throw these away
-  and rcx, 1011111b  ; keep 7th bit set above and mask the low five bits of the
-                     ; char so 'a'=1, 'b'=2,...
-  dec rcx            ; decrement rcx so 'a' offsets 0, 'b' offsets 1, ...
-                     ; if the 7th bit was set, this will be a large number
+  sub rcx, 'A'       ; subtract 'A' char so 'A'=0, 'B'=1,...
+                     ; chars < 'A' will be negative and thus not set a bit
+  and rcx, 11111b    ; mask the low five bits for case insensitivity
   bts r8, rcx        ; set the bit in the "seen" array to the offset in rcx
 
   and r8, 0x03ffffff ; mask off the low 26 bits of the seen array, more significant
