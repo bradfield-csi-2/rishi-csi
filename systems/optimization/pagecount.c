@@ -5,7 +5,7 @@
 #define TEST_LOOPS 10000000
 
 uint64_t pagecount(uint64_t memory_size, uint64_t page_size) {
-  return memory_size / page_size;
+  return memory_size >> page_size;
 }
 
 int main (int argc, char** argv) {
@@ -15,7 +15,7 @@ int main (int argc, char** argv) {
   int i, ignore = 0;
 
   uint64_t msizes[] = {1L << 32, 1L << 40, 1L << 52};
-  uint64_t psizes[] = {1L << 12, 1L << 16, 1L << 32};
+  uint64_t psizes[] = {12, 16, 32};
 
   baseline_start = clock();
   for (i = 0; i < TEST_LOOPS; i++) {
@@ -41,4 +41,3 @@ int main (int argc, char** argv) {
          time_elapsed * 1e9 / TEST_LOOPS);
   return ignore;
 }
-
