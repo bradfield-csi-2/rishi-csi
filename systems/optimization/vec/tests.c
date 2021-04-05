@@ -8,6 +8,7 @@ extern data_t dotproduct1(vec_ptr, vec_ptr);
 extern data_t dotproduct2(vec_ptr, vec_ptr);
 extern data_t dotproduct3(vec_ptr, vec_ptr);
 extern data_t dotproduct4(vec_ptr, vec_ptr);
+extern data_t dotproduct5(vec_ptr, vec_ptr);
 
 void setUp(void) {
 }
@@ -107,6 +108,7 @@ int main(void) {
     profile("dotproduct2", dotproduct2);
     profile("dotproduct3", dotproduct3);
     profile("dotproduct4", dotproduct4);
+    profile("dotproduct5", dotproduct5);
     profile("dotproduct", dotproduct);
 
     return UNITY_END();
