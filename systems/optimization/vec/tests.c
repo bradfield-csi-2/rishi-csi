@@ -4,6 +4,9 @@
 #include "vec.h"
 
 extern data_t dotproduct(vec_ptr, vec_ptr);
+extern data_t dotproduct1(vec_ptr, vec_ptr);
+extern data_t dotproduct2(vec_ptr, vec_ptr);
+extern data_t dotproduct3(vec_ptr, vec_ptr);
 
 void setUp(void) {
 }
@@ -55,7 +58,7 @@ void test_longer(void) {
   free_vec(v);
 }
 
-void profile() {
+void profile(char *fn_name, data_t (*fn)(vec_ptr u, vec_ptr v)) {
   clock_t clock_start, clock_end;
   double clocks_elapsed, time_elapsed, total_ticks = 0.0;
 
@@ -71,7 +74,7 @@ void profile() {
     }
 
     clock_start = clock();
-    dotproduct(u, v);
+    (*fn)(u, v);
     clock_end = clock();
 
     clocks_elapsed = clock_end - clock_start;
@@ -82,10 +85,12 @@ void profile() {
   }
 
   time_elapsed = total_ticks / CLOCKS_PER_SEC;
-  printf("%.3fs total (%.4f avg), for %d runs with vectors of length %ld\n",
+  printf("%s\t%d\t%.0f\t%.3f\t%.4f\t%ld\n",
+      fn_name,
+      runs,
+      total_ticks,
       time_elapsed,
       time_elapsed/runs,
-      runs,
       n);
 }
 
@@ -96,8 +101,11 @@ int main(void) {
     RUN_TEST(test_basic);
     RUN_TEST(test_longer);
 
-    printf("\nBegin profiling\n");
-    profile();
+    printf("\nFunction\tRuns\tTicks\tTime(s)\tAvg(s)\tVec Len\n");
+    profile("dotproduct1", dotproduct1);
+    profile("dotproduct2", dotproduct2);
+    profile("dotproduct3", dotproduct3);
+    profile("dotproduct", dotproduct);
 
     return UNITY_END();
 }
