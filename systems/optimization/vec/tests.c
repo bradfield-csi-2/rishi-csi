@@ -57,7 +57,7 @@ void test_longer(void) {
 
 void profile() {
   clock_t clock_start, clock_end;
-  double clocks_elapsed, time_elapsed = 0.0;
+  double clocks_elapsed, time_elapsed, total_ticks = 0.0;
 
   int runs = 100;
   long n = 1000000;
@@ -75,14 +75,18 @@ void profile() {
     clock_end = clock();
 
     clocks_elapsed = clock_end - clock_start;
-    time_elapsed += clocks_elapsed / CLOCKS_PER_SEC;
+    total_ticks += clocks_elapsed;
 
     free_vec(u);
     free_vec(v);
   }
 
-  printf("%.3fs average to get dot prodcut for vectors of length %ld\n",
-      time_elapsed / runs, n);
+  time_elapsed = total_ticks / CLOCKS_PER_SEC;
+  printf("%.3fs total (%.4f avg), for %d runs with vectors of length %ld\n",
+      time_elapsed,
+      time_elapsed/runs,
+      runs,
+      n);
 }
 
 int main(void) {
