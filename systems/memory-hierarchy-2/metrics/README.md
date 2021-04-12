@@ -79,3 +79,12 @@ Another tiny improvement is not incrementing the count in standard deviation
 ```sh
 BenchmarkMetrics/Payment_stddev-8            181           6402519 ns/op
 ```
+
+A potentially more significant improvement is to use 32-bit integers in our
+payments array instead of 64-bit as we know the bounds of each payment falls
+well below 2^32 - 1 cents. This will double the cache hit rate, but there was no
+significant speed-up.
+```sh
+BenchmarkMetrics/Average_payment-8           237           5024183 ns/op
+BenchmarkMetrics/Payment_stddev-8            189           6294602 ns/op
+```
