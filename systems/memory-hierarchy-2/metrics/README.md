@@ -43,3 +43,17 @@ BenchmarkMetrics/Average_age-8             31690             37873 ns/op
 ```
 
 This is a 30.14x speed-up
+
+Now onto the payment average and standard deviation.
+
+The first optimization that comes to mind is to treat the payment amount as
+cents only instead of dollars and cents. This also as the nice outcome of
+avoiding floating point rounding errors in general. Store money in ints until
+the very last moment.
+
+```sh
+BenchmarkMetrics/Average_payment-8           172           6828006 ns/op
+BenchmarkMetrics/Payment_stddev-8             81          14325964 ns/op
+```
+
+This is a 2.50x speed-up in average and a 2.38x speed-up in standard deviation.
