@@ -12,3 +12,11 @@ BenchmarkMetrics/Payment_stddev-8             33          34107580 ns/op
 PASS
 ok      metrics 5.030s
 ```
+
+After pulling out the ages into their own array using the "struct of arrays"
+pattern:
+
+```sh
+BenchmarkMetrics/Average_age-8              2370            502892 ns/op
+```
+This is a 2.27x speed-up.
