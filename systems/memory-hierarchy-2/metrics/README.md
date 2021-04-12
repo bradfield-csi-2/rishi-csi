@@ -57,3 +57,13 @@ BenchmarkMetrics/Payment_stddev-8             81          14325964 ns/op
 ```
 
 This is a 2.50x speed-up in average and a 2.38x speed-up in standard deviation.
+
+Just as we did with users, we can add the payment information to our struct of
+arrays. Since we have no need to group payments by user for this calculation, we
+can do away with the nested loop and keep all the amounts in just one array.
+
+```sh
+BenchmarkMetrics/Average_payment-8           235           5091768 ns/op
+BenchmarkMetrics/Payment_stddev-8            184           6461564 ns/op
+```
+This is a 3.36x speed-up in average and a 5.28x speed-up in standard deviation.

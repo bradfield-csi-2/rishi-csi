@@ -31,7 +31,8 @@ type User struct {
 }
 
 type UserData struct {
-	ages []int
+	ages           []int
+	paymentAmounts []uint64
 }
 
 func AverageAge(users *UserData) float64 {
@@ -42,27 +43,23 @@ func AverageAge(users *UserData) float64 {
 	return float64(totalAge) / float64(len(users.ages))
 }
 
-func AveragePaymentAmount(users UserMap) float64 {
+func AveragePaymentAmount(users *UserData) float64 {
 	average, count := 0.0, 0.0
-	for _, u := range users {
-		for _, p := range u.payments {
-			count += 1
-			average += (float64(p.amount) - average) / count
-		}
+	for _, amt := range users.paymentAmounts {
+		count += 1
+		average += (float64(amt) - average) / count
 	}
 	return average / 100
 }
 
 // Compute the standard deviation of payment amounts
-func StdDevPaymentAmount(users UserMap) float64 {
+func StdDevPaymentAmount(users *UserData) float64 {
 	mean := AveragePaymentAmount(users)
 	squaredDiffs, count := 0.0, 0.0
-	for _, u := range users {
-		for _, p := range u.payments {
-			count += 1
-			diff := float64(p.amount)/100 - mean
-			squaredDiffs += diff * diff
-		}
+	for _, amt := range users.paymentAmounts {
+		count += 1
+		diff := float64(amt)/100 - mean
+		squaredDiffs += diff * diff
 	}
 	return math.Sqrt(squaredDiffs / count)
 }
@@ -90,7 +87,6 @@ func LoadData() (UserMap, UserData) {
 		zip, _ := strconv.Atoi(line[3])
 		users[UserId(id)] = &User{UserId(id), name, age, Address{address, zip}, []Payment{}}
 	}
-	userData := UserData{ages: userAges}
 
 	f, err = os.Open("payments.csv")
 	if err != nil {
@@ -102,15 +98,19 @@ func LoadData() (UserMap, UserData) {
 		log.Fatalln("Unable to parse payments.csv as csv", err)
 	}
 
-	for _, line := range paymentLines {
+	numPayments := len(paymentLines)
+	paymentAmounts := make([]uint64, numPayments)
+	for i, line := range paymentLines {
 		userId, _ := strconv.Atoi(line[2])
 		paymentCents, _ := strconv.Atoi(line[0])
 		datetime, _ := time.Parse(time.RFC3339, line[1])
+		paymentAmounts[i] = uint64(paymentCents)
 		users[UserId(userId)].payments = append(users[UserId(userId)].payments, Payment{
 			uint64(paymentCents),
 			datetime,
 		})
 	}
 
+	userData := UserData{ages: userAges, paymentAmounts: paymentAmounts}
 	return users, userData
 }
