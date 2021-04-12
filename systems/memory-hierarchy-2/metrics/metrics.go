@@ -65,12 +65,27 @@ func AveragePaymentAmount(users *UserData) float64 {
 // Compute the standard deviation of payment amounts
 func StdDevPaymentAmount(users *UserData) float64 {
 	mean := AveragePaymentAmount(users) * 100
-	squaredDiffs := 0.0
-	for _, amt := range users.paymentAmounts {
-		diff := float64(amt) - mean
-		squaredDiffs += diff * diff
+	squaredDiffs1, squaredDiffs2 := 0.0, 0.0
+	pmts := users.paymentAmounts
+	nPmts := len(pmts)
+
+	i := 0
+	for i < nPmts-1 {
+		diff1 := float64(pmts[i]) - mean
+		diff2 := float64(pmts[i+1]) - mean
+		squaredDiffs1 += diff1 * diff1
+		squaredDiffs2 += diff2 * diff2
+		i += 2
 	}
-	return math.Sqrt(squaredDiffs / 10000 / float64(len(users.paymentAmounts)))
+
+	for i < nPmts {
+		diff1 := float64(pmts[i]) - mean
+		squaredDiffs1 += diff1 * diff1
+		i++
+	}
+
+	squaredDiffs := (squaredDiffs1 + squaredDiffs2) / 10000
+	return math.Sqrt(squaredDiffs / float64(len(users.paymentAmounts)))
 }
 
 func LoadData() (UserMap, UserData) {

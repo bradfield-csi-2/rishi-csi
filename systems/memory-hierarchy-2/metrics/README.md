@@ -107,3 +107,10 @@ BenchmarkMetrics/Average_payment-8          4118            292331 ns/op
 BenchmarkMetrics/Payment_stddev-8            765           1565053 ns/op
 ```
 This is a 58.50x speed-up in average and 21.79x speed-up in standard deviation.
+
+We can also unroll the loop in the standard deviation calculation, which gives
+another nice speed-up.
+```sh
+BenchmarkMetrics/Payment_stddev-8           1293            923570 ns/op
+```
+This is a 36.93x speed-up in standard deviation.
