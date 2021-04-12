@@ -17,12 +17,8 @@ type Address struct {
 	zip         int
 }
 
-type DollarAmount struct {
-	dollars, cents uint64
-}
-
 type Payment struct {
-	amount DollarAmount
+	amount uint64
 	time   time.Time
 }
 
@@ -51,11 +47,10 @@ func AveragePaymentAmount(users UserMap) float64 {
 	for _, u := range users {
 		for _, p := range u.payments {
 			count += 1
-			amount := float64(p.amount.dollars) + float64(p.amount.cents)/100
-			average += (amount - average) / count
+			average += (float64(p.amount) - average) / count
 		}
 	}
-	return average
+	return average / 100
 }
 
 // Compute the standard deviation of payment amounts
@@ -65,8 +60,7 @@ func StdDevPaymentAmount(users UserMap) float64 {
 	for _, u := range users {
 		for _, p := range u.payments {
 			count += 1
-			amount := float64(p.amount.dollars) + float64(p.amount.cents)/100
-			diff := amount - mean
+			diff := float64(p.amount)/100 - mean
 			squaredDiffs += diff * diff
 		}
 	}
@@ -113,7 +107,7 @@ func LoadData() (UserMap, UserData) {
 		paymentCents, _ := strconv.Atoi(line[0])
 		datetime, _ := time.Parse(time.RFC3339, line[1])
 		users[UserId(userId)].payments = append(users[UserId(userId)].payments, Payment{
-			DollarAmount{uint64(paymentCents / 100), uint64(paymentCents % 100)},
+			uint64(paymentCents),
 			datetime,
 		})
 	}
