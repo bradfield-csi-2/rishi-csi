@@ -88,3 +88,14 @@ significant speed-up.
 BenchmarkMetrics/Average_payment-8           237           5024183 ns/op
 BenchmarkMetrics/Payment_stddev-8            189           6294602 ns/op
 ```
+
+Again as with users, assuming we can safely avoid overflow, summing the total
+payments instead of computing the running in average in each iteration will
+provide a big boost to speed. Since we have 10^6 payments of at most 10^8 cents,
+the sum of payments will be at most 10^14 cents, which is within 2^64 - 1 ~
+10^19 of a uint64 accumulator.
+```sh
+BenchmarkMetrics/Average_payment-8          3415            342089 ns/op
+BenchmarkMetrics/Payment_stddev-8            756           1598360 ns/op
+```
+This is a 49.99x speed-up in average and 21.34x speed-up in standard deviation.
