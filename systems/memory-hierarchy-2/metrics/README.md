@@ -99,3 +99,11 @@ BenchmarkMetrics/Average_payment-8          3415            342089 ns/op
 BenchmarkMetrics/Payment_stddev-8            756           1598360 ns/op
 ```
 This is a 49.99x speed-up in average and 21.34x speed-up in standard deviation.
+
+A nice further improvement gain is to unroll the loop. Unrolling in the average
+payment calculation gives
+```sh
+BenchmarkMetrics/Average_payment-8          4118            292331 ns/op
+BenchmarkMetrics/Payment_stddev-8            765           1565053 ns/op
+```
+This is a 58.50x speed-up in average and 21.79x speed-up in standard deviation.
