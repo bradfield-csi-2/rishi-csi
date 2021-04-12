@@ -32,7 +32,7 @@ type User struct {
 
 type UserData struct {
 	ages           []int
-	paymentAmounts []uint64
+	paymentAmounts []uint32
 }
 
 func AverageAge(users *UserData) float64 {
@@ -98,12 +98,12 @@ func LoadData() (UserMap, UserData) {
 	}
 
 	numPayments := len(paymentLines)
-	paymentAmounts := make([]uint64, numPayments)
+	paymentAmounts := make([]uint32, numPayments)
 	for i, line := range paymentLines {
 		userId, _ := strconv.Atoi(line[2])
 		paymentCents, _ := strconv.Atoi(line[0])
 		datetime, _ := time.Parse(time.RFC3339, line[1])
-		paymentAmounts[i] = uint64(paymentCents)
+		paymentAmounts[i] = uint32(paymentCents)
 		users[UserId(userId)].payments = append(users[UserId(userId)].payments, Payment{
 			uint64(paymentCents),
 			datetime,
