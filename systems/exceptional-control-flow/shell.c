@@ -1,7 +1,14 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
 
 #define MAXLINE 1024
+#define MAXARGS 28
+
+// Function Prototypes
+void eval(char *cmdline);
+void parseline(char *buf, char *argv[]);
 
 int main(int argc, char *argv[]) {
   char cmdline[MAXLINE];
@@ -13,7 +20,54 @@ int main(int argc, char *argv[]) {
       printf("\nBye for now!\n");
       exit(0);
     }
-    printf("%s", cmdline);
+
+    eval(cmdline);
   }
   return 0;
+}
+
+void eval(char *cmdline) {
+  char *argv[MAXARGS];
+  char buf[MAXLINE];
+  pid_t pid;
+
+  strcpy(buf, cmdline);
+  parseline(buf, argv);
+  if (argv[0] == NULL) {
+    return;
+  }
+
+  if ((pid = fork()) == 0) {
+    if (execvp(argv[0], argv) < 0) {
+      printf("%s: Command not found.\n", argv[0]);
+      exit(0);
+    }
+  }
+
+  int status;
+  if (waitpid(pid, &status, 0) < 0) {
+    printf("waitfg: waitpid error\n");
+  }
+  return;
+}
+
+// Taken from CS:APP, 3e, Figure 8.25
+void parseline(char *buf, char *argv[]) {
+  char *delim;
+  int argc;
+
+  buf[strlen(buf)-1] = ' '; // Replace trailing '\n' with space
+
+  argc = 0;
+  while ((delim = strchr(buf, ' '))) {
+    argv[argc++] = buf;
+    *delim = '\0'; // Replace the space with a null byte
+    buf = delim + 1;
+    // Skip extra spaces
+    while (*buf && (*buf == ' ')) {
+      buf++;
+    }
+  }
+  argv[argc] = NULL;  // Need to have a NULL after all the arguments
+  return;
 }
