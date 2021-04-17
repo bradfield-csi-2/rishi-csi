@@ -3,12 +3,13 @@
 #include <string.h>
 #include <unistd.h>
 
-#define MAXLINE 1024
-#define MAXARGS 28
-
+#define MAXLINE  1024
+#define MAXARGS  28
+#define EXIT_MSG "Bye for now!"
 // Function Prototypes
 void eval(char *cmdline);
 void parseline(char *buf, char *argv[]);
+int builtin_cmd(char *argv[]);
 
 int main(int argc, char *argv[]) {
   char cmdline[MAXLINE];
@@ -17,7 +18,7 @@ int main(int argc, char *argv[]) {
     printf("🦊 ");
     fgets(cmdline, MAXLINE, stdin);
     if (feof(stdin)) {
-      printf("\nBye for now!\n");
+      printf("\n%s\n", EXIT_MSG);
       exit(0);
     }
 
@@ -37,6 +38,10 @@ void eval(char *cmdline) {
     return;
   }
 
+  if (builtin_cmd(argv)) {
+    return;
+  }
+
   if ((pid = fork()) == 0) {
     if (execvp(argv[0], argv) < 0) {
       printf("%s: Command not found.\n", argv[0]);
@@ -49,6 +54,14 @@ void eval(char *cmdline) {
     printf("waitfg: waitpid error\n");
   }
   return;
+}
+
+int builtin_cmd(char *argv[]) {
+  if (!strcmp(argv[0], "exit")) {
+    printf("%s\n", EXIT_MSG);
+    exit(0);
+  }
+  return 0;
 }
 
 // Taken from CS:APP, 3e, Figure 8.25
