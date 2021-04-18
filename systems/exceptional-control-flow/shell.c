@@ -1,3 +1,4 @@
+#include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -60,6 +61,13 @@ int builtin_cmd(char *argv[]) {
   if (!strcmp(argv[0], "exit")) {
     printf("%s\n", EXIT_MSG);
     exit(0);
+  } else if (!strcmp(argv[0], "cd")) {
+    // Change to home directory on empty cd
+    char *dir = argv[1] == NULL ? getenv("HOME") : argv[1];
+    if (chdir(dir) < 0) {
+      printf("%s: %s\n", argv[0], strerror(errno));
+      return 1;
+    }
   }
   return 0;
 }
