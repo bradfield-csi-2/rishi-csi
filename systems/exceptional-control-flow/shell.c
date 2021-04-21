@@ -1,4 +1,5 @@
 #include <errno.h>
+#include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -7,13 +8,26 @@
 #define MAXLINE  1024
 #define MAXARGS  28
 #define EXIT_MSG "Bye for now!"
+
+typedef void (*sighandler_t)(int);
+
 // Function Prototypes
 void eval(char *cmdline);
 void parseline(char *buf, char *argv[]);
 int builtin_cmd(char *argv[]);
 
+// Signal Handlers
+void sigint_handler(int sig) {
+  return;
+}
+
 int main(int argc, char *argv[]) {
   char cmdline[MAXLINE];
+
+  // Install signal handlers
+  if (signal(SIGINT, sigint_handler) == SIG_ERR) {
+    printf("signal error\n");
+  }
 
   while (1) {
     printf("🦊 ");
