@@ -12,7 +12,7 @@
 typedef void (*sighandler_t)(int);
 
 // Function Prototypes
-void eval(char *cmdline);
+int eval(char *cmdline);
 void parseline(char *buf, char *argv[]);
 int builtin_cmd(char *argv[]);
 
@@ -21,8 +21,25 @@ void sigint_handler(int sig) {
   return;
 }
 
+void split_cmd(char *cmdline, char *parts[]) {
+  const char *s = "&&";
+  char *token;
+
+  int i = 0;
+  token = strtok(cmdline, s);
+  while (token) {
+    parts[i] = token;
+    token = strtok(NULL, s);
+    i++;
+  }
+  return;
+}
+
 int main(int argc, char *argv[]) {
   char cmdline[MAXLINE];
+  char buf[MAXLINE];
+  char *parts[2];
+  int exit_status;
 
   // Install signal handlers
   if (signal(SIGINT, sigint_handler) == SIG_ERR) {
@@ -37,12 +54,22 @@ int main(int argc, char *argv[]) {
       exit(0);
     }
 
-    eval(cmdline);
+    if (strstr(cmdline, "&&")) {
+      strcpy(buf, cmdline);
+      split_cmd(buf, parts);
+      for (int i = 0; i < 2; i++) {
+        if (eval(parts[i])) {
+          break;
+        }
+      }
+    } else {
+      eval(cmdline);
+    }
   }
   return 0;
 }
 
-void eval(char *cmdline) {
+int eval(char *cmdline) {
   char *argv[MAXARGS];
   char buf[MAXLINE];
   pid_t pid;
@@ -50,11 +77,11 @@ void eval(char *cmdline) {
   strcpy(buf, cmdline);
   parseline(buf, argv);
   if (argv[0] == NULL) {
-    return;
+    return 0;
   }
 
   if (builtin_cmd(argv)) {
-    return;
+    return 0;
   }
 
   if ((pid = fork()) == 0) {
@@ -67,8 +94,12 @@ void eval(char *cmdline) {
   int status;
   if (waitpid(pid, &status, 0) < 0) {
     printf("waitfg: waitpid error\n");
+  } else {
+    if (WIFEXITED(status)) {
+      return WEXITSTATUS(status);
+    }
   }
-  return;
+  return 0;
 }
 
 int builtin_cmd(char *argv[]) {
@@ -92,6 +123,9 @@ void parseline(char *buf, char *argv[]) {
   int argc;
 
   buf[strlen(buf)-1] = ' '; // Replace trailing '\n' with space
+  while (*buf && (*buf == ' ')) {
+    buf++; // Trim leading spaces
+  }
 
   argc = 0;
   while ((delim = strchr(buf, ' '))) {
