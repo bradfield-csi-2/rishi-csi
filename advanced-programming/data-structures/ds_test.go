@@ -63,3 +63,27 @@ func TestSliceSum(t *testing.T) {
 		}
 	}
 }
+
+func TestHashSum(t *testing.T) {
+	var tests = []struct {
+		input     map[int]int
+		want_ksum int
+		want_vsum int
+	}{
+		{map[int]int{0: 1, 1: 2, 2: 3}, 3, 6},
+		//	{map[int]int{100: 100, 2: 2, -100: -100}, 2, 2},
+		//	{map[int]int{}, 0, 0},
+		//	{map[int]int{-1238595: 23495}, -1238595, 23495},
+	}
+	for _, test := range tests {
+		got_ksum, got_vsum := HashSum(test.input)
+		if got_ksum != test.want_ksum || got_vsum != test.want_vsum {
+			t.Errorf("HashSum(%v) = keysum: %v, valsum: %v, want keysum: %v, valsum: %v",
+				test.input,
+				got_ksum,
+				got_vsum,
+				test.want_ksum,
+				test.want_vsum)
+		}
+	}
+}
