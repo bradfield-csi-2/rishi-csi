@@ -46,3 +46,20 @@ func TestStringsPointToSame(t *testing.T) {
 		}
 	}
 }
+
+func TestSliceSum(t *testing.T) {
+	var tests = []struct {
+		input []int
+		want  int
+	}{
+		{[]int{1, 2, 3}, 6},
+		{[]int{100, 2, -100}, 2},
+		{[]int{}, 0},
+		{[]int{-1238595}, -1238595},
+	}
+	for _, test := range tests {
+		if got := SliceSum(test.input); got != test.want {
+			t.Errorf("SliceSum(%v) = %v, want %v", test.input, got, test.want)
+		}
+	}
+}
