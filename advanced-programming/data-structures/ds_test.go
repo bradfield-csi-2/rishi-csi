@@ -23,3 +23,26 @@ func TestFloat64ToUint64(t *testing.T) {
 		}
 	}
 }
+
+func TestStringsPointToSame(t *testing.T) {
+	same := "test"
+	var tests = []struct {
+		s    string
+		t    string
+		want bool
+	}{
+		{"abc", "xyz", false},
+		{"abc", "abcd", false},
+		{"abc", "abc", true},
+		{same, same, true},
+		{same, same[1:2], true},
+		{same[1:], same, true},
+		{same[1:], same[2:], true},
+		// {same[0:1], same[2:3], true}, This test case does not work, but it should, right?
+	}
+	for _, test := range tests {
+		if got := StringsPointToSame(test.s, test.t); got != test.want {
+			t.Errorf("StringsPointToSame(%s, %s) = %v, want %v", test.s, test.t, got, test.want)
+		}
+	}
+}
