@@ -91,13 +91,11 @@ func SliceSum(s []int) int {
 }
 
 func HashSum(m map[int]int) (ksum, vsum int) {
-	// Need this type to pull out the actual pointer to the hmap
-	type mapinterface struct {
-		maptype unsafe.Pointer
-		data    unsafe.Pointer
-	}
-	hmapptr := (*hmap)((*mapinterface)(unsafe.Pointer(&m)).data)
+	hmapptr := *(**hmap)(unsafe.Pointer(&m))
 	buckets := hmapptr.buckets
+	if buckets == nil {
+		return // Map is empty
+	}
 	numbkts := uintptr(1 << hmapptr.B)
 
 	thoffset := unsafe.Sizeof(uint8(0)) // Offset for tophash elements
