@@ -71,9 +71,9 @@ func TestHashSum(t *testing.T) {
 		want_vsum int
 	}{
 		{map[int]int{0: 1, 1: 2, 2: 3}, 3, 6},
-		//	{map[int]int{100: 100, 2: 2, -100: -100}, 2, 2},
-		//	{map[int]int{}, 0, 0},
-		//	{map[int]int{-1238595: 23495}, -1238595, 23495},
+		{map[int]int{100: 100, 2: 2, -100: -100}, 2, 2},
+		{map[int]int{}, 0, 0},
+		{map[int]int{-1238595: 23495}, -1238595, 23495},
 	}
 	for _, test := range tests {
 		got_ksum, got_vsum := HashSum(test.input)
