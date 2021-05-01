@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"runtime"
 	"unsafe"
 )
 
@@ -68,10 +69,12 @@ func MethodInfo(rw io.ReadWriter) {
 
 	fmt.Printf("The interfaces has %d methods\n", len(methods))
 
-	f0 := ip.tab.fun[0]
+	f0 := &ip.tab.fun
 	for i, _ := range methods {
-		f := uintptr(unsafe.Pointer(f0)) + uintptr(i*8)
-		fmt.Printf("Method %d has address #%v\n", i, unsafe.Pointer(f))
+		f := uintptr(unsafe.Pointer(f0)) + uintptr(i)*unsafe.Sizeof(uintptr(0))
+
+		fnc := runtime.FuncForPC(*(*uintptr)(unsafe.Pointer(f)))
+		fmt.Printf("Method %d: %s\n", i, fnc.Name())
 	}
 }
 
