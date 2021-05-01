@@ -2,6 +2,8 @@ package main
 
 import (
 	"fmt"
+	"io"
+	"os"
 	"unsafe"
 )
 
@@ -60,9 +62,17 @@ func ExtractInt(i interface{}) int {
 	return *(*int)((*iface)(unsafe.Pointer(&i)).data)
 }
 
-func MethodInfo(i interface{}) {
-	iface_ptr := (*iface)(unsafe.Pointer(&i))
-	fmt.Printf("#v\n", iface_ptr)
+func MethodInfo(rw io.ReadWriter) {
+	ip := (*iface)(unsafe.Pointer(&rw))
+	methods := ip.tab.inter.mhdr
+
+	fmt.Printf("The interfaces has %d methods\n", len(methods))
+
+	f0 := ip.tab.fun[0]
+	for i, _ := range methods {
+		f := uintptr(unsafe.Pointer(f0)) + uintptr(i*8)
+		fmt.Printf("Method %d has address #%v\n", i, unsafe.Pointer(f))
+	}
 }
 
 func main() {
@@ -70,5 +80,6 @@ func main() {
 	var i interface{} = x
 	fmt.Printf("%d\n", ExtractInt(i))
 
-	MethodInfo(2)
+	var rw io.ReadWriter = os.Stdout
+	MethodInfo(rw)
 }
