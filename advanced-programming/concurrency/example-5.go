@@ -28,8 +28,20 @@ func query(endpoint string) string {
 // Query each of the mirrors in parallel and return the first
 // response (this approach increases the amount of traffic but
 // significantly improves "tail latency")
-func parallelQuery(endpoints []string) string {
+func parallelQuery_orig(endpoints []string) string {
 	results := make(chan string)
+	for i := range endpoints {
+		go func(i int) {
+			results <- query(endpoints[i])
+		}(i)
+	}
+	return <-results
+}
+
+// The channel should be buffered so that we get any of the three that come
+// back without the others blocking and causing a goroutine leak
+func parallelQuery(endpoints []string) string {
+	results := make(chan string, 3)
 	for i := range endpoints {
 		go func(i int) {
 			results <- query(endpoints[i])
