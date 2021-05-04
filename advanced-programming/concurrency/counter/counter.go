@@ -6,6 +6,8 @@ import (
 	"sync/atomic"
 )
 
+var mu sync.Mutex
+
 type counterService interface {
 	// Returns values in ascending order; it should be safe to call
 	// getNext() concurrently without any additional synchronization.
@@ -29,6 +31,18 @@ type SyncAtomicCounter struct {
 
 func (c *SyncAtomicCounter) getNext() uint64 {
 	return atomic.AddUint64(&c.counter, 1)
+}
+
+// Part 3: Implement with sync/mutex
+type MutexCounter struct {
+	counter uint64
+}
+
+func (c *MutexCounter) getNext() uint64 {
+	mu.Lock()
+	defer mu.Unlock()
+	c.counter++
+	return c.counter
 }
 
 // Function to exercise counters
