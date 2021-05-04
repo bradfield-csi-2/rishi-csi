@@ -28,3 +28,12 @@ func TestMutexCounter(t *testing.T) {
 		t.Errorf("Expected getNext() to have value %d, got %d", want, got)
 	}
 }
+
+func TestChanCounter(t *testing.T) {
+	cc := &ChanCounter{responses: CounterGenerator()}
+	got := GetCounters(cc, 10)
+	want := uint64(31) // Expect mc to have value 30 (10 * 3 per goroutine) + 1
+	if got != want {
+		t.Errorf("Expected getNext() to have value %d, got %d", want, got)
+	}
+}

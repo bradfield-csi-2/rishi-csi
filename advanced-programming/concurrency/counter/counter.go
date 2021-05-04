@@ -45,6 +45,30 @@ func (c *MutexCounter) getNext() uint64 {
 	return c.counter
 }
 
+// Part 4: Implement with channels
+var requests chan struct{} = make(chan struct{})
+
+type ChanCounter struct {
+	responses <-chan uint64
+}
+
+func (c *ChanCounter) getNext() uint64 {
+	requests <- struct{}{}
+	return <-c.responses
+}
+
+func CounterGenerator() <-chan uint64 {
+	c := make(chan uint64)
+	go func() {
+		counter := uint64(0)
+		for _ = range requests {
+			counter++
+			c <- counter
+		}
+	}()
+	return c
+}
+
 // Function to exercise counters
 func GetCounters(cs counterService, n int) uint64 {
 	var wg sync.WaitGroup
