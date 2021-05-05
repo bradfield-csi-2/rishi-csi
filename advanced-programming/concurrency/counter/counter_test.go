@@ -30,7 +30,7 @@ func TestMutexCounter(t *testing.T) {
 }
 
 func TestChanCounter(t *testing.T) {
-	cc := &ChanCounter{responses: CounterGenerator()}
+	cc := new(ChanCounter).New()
 	got := GetCounters(cc, 10)
 	want := uint64(31) // Expect mc to have value 30 (10 * 3 per goroutine) + 1
 	if got != want {
