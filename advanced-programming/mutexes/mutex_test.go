@@ -1,6 +1,9 @@
 package main
 
-import "testing"
+import (
+	"sync"
+	"testing"
+)
 
 func TestMutex(t *testing.T) {
 	var tests = []struct {
@@ -15,9 +18,21 @@ func TestMutex(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		got := Count(test.iter)
+		got := Count(new(mutex), test.iter)
 		if got != test.want {
 			t.Errorf("Count(%d) = %d, want %d", test.iter, got, test.want)
 		}
+	}
+}
+
+func BenchmarkMyMutex(b *testing.B) {
+	for n := 0; n < b.N; n++ {
+		Count(new(mutex), 10000)
+	}
+}
+
+func BenchmarkSyncMutex(b *testing.B) {
+	for n := 0; n < b.N; n++ {
+		Count(new(sync.Mutex), 10000)
 	}
 }

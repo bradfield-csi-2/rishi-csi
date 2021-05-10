@@ -20,8 +20,7 @@ func (m *mutex) Unlock() {
 	atomic.SwapUint32(&m.locked, 0)
 }
 
-func Count(iter int) int {
-	lock := new(mutex)
+func Count(lock sync.Locker, iter int) int {
 	counter := 0
 	var wg sync.WaitGroup
 
@@ -40,6 +39,7 @@ func Count(iter int) int {
 }
 
 func main() {
-	x := Count(10000)
+	lock := new(mutex)
+	x := Count(lock, 10000)
 	fmt.Printf("Counter %d\n", x)
 }
