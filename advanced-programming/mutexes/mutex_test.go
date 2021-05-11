@@ -10,11 +10,11 @@ func TestMutex(t *testing.T) {
 		iter int
 		want int
 	}{
-		{iter: 1000, want: 1000},
-		{iter: 1, want: 1},
+		{iter: 1000, want: 100000},
+		{iter: 1, want: 100},
 		{iter: 0, want: 0},
-		{iter: 5000, want: 5000},
-		{iter: 50000, want: 50000},
+		{iter: 5000, want: 500000},
+		{iter: 50000, want: 5000000},
 	}
 
 	for _, test := range tests {

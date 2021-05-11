@@ -11,7 +11,7 @@ type mutex struct {
 }
 
 func (m *mutex) Lock() {
-	for atomic.SwapUint32(&m.locked, 1) == 1 {
+	for atomic.CompareAndSwapUint32(&m.locked, 0, 1) == false {
 		// Spin until we're unlocked
 	}
 }
@@ -28,9 +28,11 @@ func Count(lock sync.Locker, iter int) int {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			lock.Lock()
-			counter++
-			lock.Unlock()
+			for j := 0; j < 100; j++ {
+				lock.Lock()
+				counter++
+				lock.Unlock()
+			}
 		}()
 	}
 
