@@ -8,7 +8,9 @@ import (
 func main() {
 	key := "carrot"
 	val := "orange"
-	rocks.Put(key, val)
-	newVal := rocks.Get(key)
-	fmt.Printf("key %s has value = %s\n", key, newVal)
+
+	db := rocks.CreateDB()
+	db.Put(key, val)
+	newVal := db.Get(key)
+	fmt.Printf("key %s has value: %s\n", key, newVal)
 }
