@@ -13,4 +13,5 @@ func main() {
 	db.Put(key, val)
 	newVal := db.Get(key)
 	fmt.Printf("key %s has value: %s\n", key, newVal)
+	rocks.DestroyDB(db)
 }
