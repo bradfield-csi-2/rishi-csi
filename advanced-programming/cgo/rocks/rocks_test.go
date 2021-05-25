@@ -5,7 +5,7 @@ import (
 )
 
 func TestRocksDB(t *testing.T) {
-	db := CreateDB()
+	db, _ := CreateDB()
 	defer func() {
 		DestroyDB(db)
 	}()
@@ -21,7 +21,11 @@ func TestRocksDB(t *testing.T) {
 
 	for _, test := range tests {
 		db.Put(test.key, test.val)
-		if got := db.Get(test.key); got != test.val {
+		got, err := db.Get(test.key)
+		if err != nil {
+			t.Errorf("db.Get(%s) error: %s", test.key, err)
+		}
+		if got != test.val {
 			t.Errorf("db.Get(%s) returned %s, want %s", test.key, got, test.val)
 		}
 	}
