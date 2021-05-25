@@ -6,6 +6,9 @@ import (
 
 func TestRocksDB(t *testing.T) {
 	db := CreateDB()
+	defer func() {
+		DestroyDB(db)
+	}()
 
 	var tests = []struct {
 		key string
