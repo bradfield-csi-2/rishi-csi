@@ -8,7 +8,10 @@ package rocks
 #include <rocksdb/c.h>
 */
 import "C"
-import "unsafe"
+import (
+	"fmt"
+	"unsafe"
+)
 
 type database struct {
 	db           *C.rocksdb_t
@@ -18,7 +21,7 @@ type database struct {
 	err          *C.char
 }
 
-func (db *database) Get(key string) string {
+func (db *database) Get(key string) (string, error) {
 	length := C.size_t(0)
 	k := C.CString(key)
 	v := C.rocksdb_get(db.db, db.readOptions, k, C.strlen(k), &length, &db.err)
@@ -27,10 +30,13 @@ func (db *database) Get(key string) string {
 		C.free(unsafe.Pointer(v))
 	}()
 
-	return C.GoString(v)
+	if db.err != nil {
+		return "", fmt.Errorf("rocks: %s", C.GoString(db.err))
+	}
+	return C.GoString(v), nil
 }
 
-func (db *database) Put(key, val string) {
+func (db *database) Put(key, val string) error {
 	k := C.CString(key)
 	v := C.CString(val)
 	defer func() {
@@ -39,24 +45,33 @@ func (db *database) Put(key, val string) {
 	}()
 
 	C.rocksdb_put(db.db, db.writeOptions, k, C.strlen(k), v, C.strlen(v)+1, &db.err)
+	if db.err != nil {
+		return fmt.Errorf("rocks: %s", C.GoString(db.err))
+	}
+
+	return nil
 }
 
-func CreateDB() *database {
+func CreateDB() (*database, error) {
 	options := C.rocksdb_options_create()
 	C.rocksdb_options_set_create_if_missing(options, 1)
 	writeOptions := C.rocksdb_writeoptions_create()
 	readOptions := C.rocksdb_readoptions_create()
 
+	var err *C.char
 	dbpath := C.CString("/tmp/rocksdb_test")
-	err := C.CString("")
 	rocksdb := C.rocksdb_open(options, dbpath, &err)
+
+	if err != nil {
+		return nil, fmt.Errorf("rocks: %s", C.GoString(err))
+	}
 
 	return &database{db: rocksdb,
 		options:      options,
 		writeOptions: writeOptions,
 		readOptions:  readOptions,
 		err:          err,
-	}
+	}, nil
 }
 
 func DestroyDB(db *database) {
