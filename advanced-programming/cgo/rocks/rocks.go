@@ -11,53 +11,58 @@ import "C"
 import "unsafe"
 
 type database struct {
-	db      *C.rocksdb_t
-	options *C.rocksdb_options_t
-	err     *C.char
+	db           *C.rocksdb_t
+	options      *C.rocksdb_options_t
+	writeOptions *C.rocksdb_writeoptions_t
+	readOptions  *C.rocksdb_readoptions_t
+	err          *C.char
 }
 
 func (db *database) Get(key string) string {
-	k := C.CString(key)
 	length := C.size_t(0)
-	readOptions := C.rocksdb_readoptions_create()
-	v := C.rocksdb_get(db.db, readOptions, k, C.strlen(k), &length, &db.err)
-	val := C.GoString(v)
-
+	k := C.CString(key)
+	v := C.rocksdb_get(db.db, db.readOptions, k, C.strlen(k), &length, &db.err)
 	defer func() {
 		C.free(unsafe.Pointer(k))
 		C.free(unsafe.Pointer(v))
-		C.free(unsafe.Pointer(readOptions))
 	}()
 
-	return val
+	return C.GoString(v)
 }
 
 func (db *database) Put(key, val string) {
 	k := C.CString(key)
 	v := C.CString(val)
-	writeOptions := C.rocksdb_writeoptions_create()
 	defer func() {
 		C.free(unsafe.Pointer(k))
 		C.free(unsafe.Pointer(v))
-		C.free(unsafe.Pointer(writeOptions))
 	}()
 
-	C.rocksdb_put(db.db, writeOptions, k, C.strlen(k), v, C.strlen(v)+1, &db.err)
-}
-
-func DestroyDB(db *database) {
-	C.free(unsafe.Pointer(db.options))
-	C.free(unsafe.Pointer(db.err))
-	C.rocksdb_close(db.db)
+	C.rocksdb_put(db.db, db.writeOptions, k, C.strlen(k), v, C.strlen(v)+1, &db.err)
 }
 
 func CreateDB() *database {
 	options := C.rocksdb_options_create()
 	C.rocksdb_options_set_create_if_missing(options, 1)
+	writeOptions := C.rocksdb_writeoptions_create()
+	readOptions := C.rocksdb_readoptions_create()
 
 	dbpath := C.CString("/tmp/rocksdb_test")
 	err := C.CString("")
 	rocksdb := C.rocksdb_open(options, dbpath, &err)
 
-	return &database{db: rocksdb, options: options, err: err}
+	return &database{db: rocksdb,
+		options:      options,
+		writeOptions: writeOptions,
+		readOptions:  readOptions,
+		err:          err,
+	}
+}
+
+func DestroyDB(db *database) {
+	C.free(unsafe.Pointer(db.err))
+	C.rocksdb_readoptions_destroy(db.readOptions)
+	C.rocksdb_writeoptions_destroy(db.writeOptions)
+	C.rocksdb_options_destroy(db.options)
+	C.rocksdb_close(db.db)
 }
