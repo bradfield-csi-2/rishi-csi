@@ -44,7 +44,9 @@ func (db *database) Put(key, val string) error {
 		C.free(unsafe.Pointer(v))
 	}()
 
-	C.rocksdb_put(db.db, db.writeOptions, k, C.strlen(k), v, C.strlen(v)+1, &db.err)
+	klen := C.size_t(len(key))
+	vlen := C.size_t(len(val)) + 1
+	C.rocksdb_put(db.db, db.writeOptions, k, klen, v, vlen, &db.err)
 	if db.err != nil {
 		return fmt.Errorf("rocks: %s", C.GoString(db.err))
 	}
