@@ -10,7 +10,7 @@ func main() {
 	key := "carrot"
 	val := "orange"
 
-	db, err := rocks.CreateDB()
+	db, err := rocks.CreateDB("/tmp/rocksdb_test")
 	if err != nil {
 		log.Fatalf("rocker: error creating database: %s", err)
 	}
