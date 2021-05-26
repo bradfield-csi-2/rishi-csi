@@ -5,7 +5,7 @@ import (
 )
 
 func TestRocksDB(t *testing.T) {
-	db, _ := CreateDB()
+	db, _ := CreateDB("/tmp/rocksdb_test")
 	defer func() {
 		DestroyDB(db)
 	}()

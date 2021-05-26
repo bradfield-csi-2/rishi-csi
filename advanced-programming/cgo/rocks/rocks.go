@@ -52,21 +52,22 @@ func (db *database) Put(key, val string) error {
 	return nil
 }
 
-func CreateDB() (*database, error) {
+func CreateDB(path string) (*database, error) {
 	options := C.rocksdb_options_create()
 	C.rocksdb_options_set_create_if_missing(options, 1)
 	writeOptions := C.rocksdb_writeoptions_create()
 	readOptions := C.rocksdb_readoptions_create()
 
 	var err *C.char
-	dbpath := C.CString("/tmp/rocksdb_test")
+	dbpath := C.CString(path)
 	rocksdb := C.rocksdb_open(options, dbpath, &err)
 
 	if err != nil {
 		return nil, fmt.Errorf("rocks: %s", C.GoString(err))
 	}
 
-	return &database{db: rocksdb,
+	return &database{
+		db:           rocksdb,
 		options:      options,
 		writeOptions: writeOptions,
 		readOptions:  readOptions,
