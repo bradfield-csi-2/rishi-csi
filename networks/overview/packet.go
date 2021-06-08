@@ -31,10 +31,28 @@ type EthernetFrameHeader struct {
 	Ethertype uint16
 }
 
-type Packet struct {
-	EthernetFrameHeader
-	Payload       [64]byte
-	FrameCheckSeq [4]byte
+type IPDatagramHeader struct {
+	Version_IHL          byte
+	DSCP_ECN             byte
+	Length               uint16
+	ID                   uint16
+	Flags_FragmentOffset [2]byte
+	TTL                  uint8
+	Protocol             uint8
+	HeaderChecksum       uint16
+	SrcIP                [4]byte
+	DestIP               [4]byte
+}
+
+type TCPSegmentHeader struct {
+	SrcPort                   uint16
+	DstPort                   uint16
+	SeqNum                    uint32
+	AckNum                    uint32
+	DataOffset_Reserved_Flags [2]byte
+	WindowSize                uint16
+	Checksum                  uint16
+	UrgentPtr                 uint16
 }
 
 func main() {
@@ -54,17 +72,54 @@ func main() {
 	offset += int64(unsafe.Sizeof(*fileHeader))
 	snapshotLen := int64(fileHeader.SnapshotLen)
 
+	var packetCount int
 	for offset < capturedBytes {
-		packetHeaderReader := io.NewSectionReader(f, offset, snapshotLen)
-		packetHeader := parsePacketHeader(packetHeaderReader)
-		offset += int64(unsafe.Sizeof(*packetHeader))
-		fmt.Printf("Pcap Packet Header:\n%+v\n", packetHeader)
+		pcapHeaderReader := io.NewSectionReader(f, offset, snapshotLen)
+		pcapHeader := parsePcapHeader(pcapHeaderReader)
+		offset += int64(unsafe.Sizeof(*pcapHeader))
+		fmt.Printf("Pcap Packet Header:\n%+v\n", pcapHeader)
 
-		packetReader := io.NewSectionReader(f, offset, int64(packetHeader.Length))
-		packet := parsePacket(packetReader)
-		offset += int64(packetHeader.Length)
-		fmt.Printf("Packet:\n%+v\n", packet)
+		ethReader := io.NewSectionReader(f, offset, int64(pcapHeader.Length))
+		ethHeader := parsePacket(ethReader)
+		ethHeaderLen := int64(unsafe.Sizeof(*ethHeader))
+		offset += ethHeaderLen
+		fmt.Printf("Ethernet Header:\n%+v\n", ethHeader)
+
+		ipHeaderReader := io.NewSectionReader(f, offset, int64(pcapHeader.Length))
+		ipHeader := parseIPHeader(ipHeaderReader)
+		ipHeaderLen := int64((ipHeader.Version_IHL<<4)>>4) * 4
+		offset += ipHeaderLen
+		fmt.Printf("IP Datagram Header:\n%+v\nLength: %d\n", ipHeader, ipHeaderLen)
+
+		tcpSegmentReader := io.NewSectionReader(f, offset, int64(pcapHeader.Length))
+		tcpSegmentHeader := parseTCPHeader(tcpSegmentReader)
+		dataOffset := int64(((tcpSegmentHeader.DataOffset_Reserved_Flags[0]) >> 4) * 4)
+		fmt.Printf("TCP Segment Header:\n%+v\nData Offset: %d\n", tcpSegmentHeader, dataOffset)
+
+		tcpSegmentDataReader := io.NewSectionReader(f, offset+dataOffset, int64(pcapHeader.Length))
+		tcpData := make([]byte, int64(ipHeader.Length)-ipHeaderLen-dataOffset)
+		tcpSegmentDataReader.Read(tcpData)
+		fmt.Printf("%s\n", tcpData)
+
+		offset += int64(pcapHeader.Length) - ethHeaderLen - ipHeaderLen
+
+		packetCount++
+		fmt.Println("======================================")
 	}
+
+	fmt.Printf("Total Packets: %d\n", packetCount)
+}
+
+func parseTCPHeader(f io.Reader) *TCPSegmentHeader {
+	tcpHeader := new(TCPSegmentHeader)
+	binary.Read(f, binary.BigEndian, tcpHeader)
+	return tcpHeader
+}
+
+func parseIPHeader(f io.Reader) *IPDatagramHeader {
+	ipHeader := new(IPDatagramHeader)
+	binary.Read(f, binary.BigEndian, ipHeader)
+	return ipHeader
 }
 
 func parsePacket(f io.Reader) *EthernetFrameHeader {
@@ -79,7 +134,7 @@ func parseFileHeader(f io.Reader) *PcapFileHeader {
 	return header
 }
 
-func parsePacketHeader(f io.Reader) *PcapPacketHeader {
+func parsePcapHeader(f io.Reader) *PcapPacketHeader {
 	header := new(PcapPacketHeader)
 	binary.Read(f, binary.LittleEndian, header)
 	return header
