@@ -81,61 +81,50 @@ func main() {
 	var offset int64
 
 	fileHeader := parseFileHeader(f)
-	fmt.Printf("Pcap File Header:\n%+v\n", fileHeader)
-
 	offset += int64(unsafe.Sizeof(*fileHeader))
 	snapshotLen := int64(fileHeader.SnapshotLen)
 
-	var packetCount int
-	var i int
 	imagePackets := make([]ImagePacket, 100)
 	for offset < capturedBytes {
 		pcapHeaderReader := io.NewSectionReader(f, offset, snapshotLen)
 		pcapHeader := parsePcapHeader(pcapHeaderReader)
 		offset += int64(unsafe.Sizeof(*pcapHeader))
-		//fmt.Printf("Pcap Packet Header:\n%+v\n", pcapHeader)
 
 		ethReader := io.NewSectionReader(f, offset, int64(pcapHeader.Length))
 		ethHeader := parsePacket(ethReader)
 		ethHeaderLen := int64(unsafe.Sizeof(*ethHeader))
 		offset += ethHeaderLen
-		//fmt.Printf("Ethernet Header:\n%+v\n", ethHeader)
 
 		ipHeaderReader := io.NewSectionReader(f, offset, int64(pcapHeader.Length))
 		ipHeader := parseIPHeader(ipHeaderReader)
 		ipHeaderLen := int64((ipHeader.Version_IHL<<4)>>4) * 4
 		offset += ipHeaderLen
-		//fmt.Printf("IP Datagram Header:\n%+v\nLength: %d\n", ipHeader, ipHeaderLen)
 
 		tcpSegmentReader := io.NewSectionReader(f, offset, int64(pcapHeader.Length))
 		tcpSegmentHeader := parseTCPHeader(tcpSegmentReader)
 		dataOffset := int64(((tcpSegmentHeader.DataOffset_Reserved_Flags[0]) >> 4) * 4)
-		//fmt.Printf("TCP Segment Header:\n%+v\nData Offset: %d\n", tcpSegmentHeader, dataOffset)
 
 		tcpSegmentDataReader := io.NewSectionReader(f, offset+dataOffset, int64(pcapHeader.Length))
 		tcpData := make([]byte, int64(ipHeader.Length)-ipHeaderLen-dataOffset)
 		tcpSegmentDataReader.Read(tcpData)
-		//fmt.Printf("%s\n", tcpData)
 
+		// Stick all the data from the server (from port 80) into an array for
+		// later combining
 		if tcpSegmentHeader.SrcPort == 80 {
-			imagePackets[i] = ImagePacket{
-				SeqNum: tcpSegmentHeader.SeqNum,
-				Data:   tcpData,
-			}
-			i++
+			imagePackets = append(
+				imagePackets,
+				ImagePacket{SeqNum: tcpSegmentHeader.SeqNum, Data: tcpData},
+			)
 		}
 
 		offset += int64(pcapHeader.Length) - ethHeaderLen - ipHeaderLen
-		packetCount++
-		fmt.Println("======================================")
 	}
 
-	fmt.Printf("Total Packets: %d\n", packetCount)
 	combined := combineTcpResponse(imagePackets)
-
 	httpHeader, imageData := parseHTTPResponse(combined)
-	fmt.Printf("%s\n", httpHeader)
+	fmt.Printf("HTTP Header:\n\n%s\n", httpHeader)
 	ioutil.WriteFile("img.jpg", imageData, 0644)
+	fmt.Println("\nWrote img.jpg")
 }
 
 func parseHTTPResponse(resp []byte) (header string, image []byte) {
@@ -178,14 +167,14 @@ func parsePacket(f io.Reader) *EthernetFrameHeader {
 	return packet
 }
 
-func parseFileHeader(f io.Reader) *PcapFileHeader {
-	header := new(PcapFileHeader)
+func parsePcapHeader(f io.Reader) *PcapPacketHeader {
+	header := new(PcapPacketHeader)
 	binary.Read(f, binary.LittleEndian, header)
 	return header
 }
 
-func parsePcapHeader(f io.Reader) *PcapPacketHeader {
-	header := new(PcapPacketHeader)
+func parseFileHeader(f io.Reader) *PcapFileHeader {
+	header := new(PcapFileHeader)
 	binary.Read(f, binary.LittleEndian, header)
 	return header
 }
