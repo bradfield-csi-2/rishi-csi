@@ -59,6 +59,13 @@ func main() {
 
 	dnsQuery := buildDNSQuery(domain)
 	fmt.Printf("DNS Query: % x\n", dnsQuery)
+
+	googleSockAddr := &syscall.SockaddrInet4{Addr: googleDNSAddr, Port: googleDNSPort}
+	err = syscall.Sendto(socket, dnsQuery, 0, googleSockAddr)
+	if err != nil {
+		fmt.Printf("dns: could not send query: %s\n", err)
+		os.Exit(1)
+	}
 }
 
 func buildDNSQuery(domain string) []byte {
