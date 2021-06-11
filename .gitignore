@@ -4,3 +4,6 @@ myls
 xkcd
 shell
 rocker
+
+dns
+!dns/
