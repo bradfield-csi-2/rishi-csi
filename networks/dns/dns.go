@@ -66,6 +66,17 @@ func main() {
 		fmt.Printf("dns: could not send query: %s\n", err)
 		os.Exit(1)
 	}
+
+	resp := make([]byte, 100)
+	n, from, err := syscall.Recvfrom(socket, resp, 0)
+	if err != nil {
+		fmt.Printf("dns: could not receive response: %s\n", err)
+		os.Exit(1)
+	}
+	resp = resp[:n]
+
+	fmt.Printf("Bytes received: %d\nFrom: %+v\n", n, from)
+	fmt.Printf("Raw Resp: % x\n", resp)
 }
 
 func buildDNSQuery(domain string) []byte {
