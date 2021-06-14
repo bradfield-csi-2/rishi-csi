@@ -32,12 +32,19 @@ func main() {
 		fmt.Printf("proxy: could not listen on port %d: %s\n", PORT, err)
 		os.Exit(1)
 	}
-
-	nfd, sa, err := syscall.Accept(sock)
+	nfd, _, err := syscall.Accept(sock)
 	if err != nil {
 		fmt.Printf("proxy: could not accept on port %d: %s\n", PORT, err)
 		os.Exit(1)
 	}
 
-	fmt.Printf("New FD: %d\tSockAddr: %+v\n", nfd, sa)
+	for {
+		buf := make([]byte, 1024)
+		n, _, _, from, err := syscall.Recvmsg(nfd, buf, nil, 0)
+		if err != nil {
+			fmt.Printf("proxy: error receiving message: %s\n", err)
+			os.Exit(1)
+		}
+		syscall.Sendmsg(nfd, buf[:n], nil, from, 0)
+	}
 }
