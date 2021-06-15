@@ -34,13 +34,12 @@ func main() {
 
 	// Open a socket and connect to a "remote" server for forwarding
 	srvSock, _ := syscall.Socket(syscall.AF_INET, syscall.SOCK_STREAM, 0)
-	srvSockAddr := &syscall.SockaddrInet4{Addr: localhost, Port: 1234}
+	srvSockAddr := &syscall.SockaddrInet4{Addr: localhost, Port: 9000}
 	err = syscall.Connect(srvSock, srvSockAddr)
 	if err != nil {
 		fmt.Printf("proxy: could not connect to remote server: %s\n", err)
 		os.Exit(1)
 	}
-	defer syscall.Close(srvSock)
 
 	for {
 		nfd, _, err := syscall.Accept(sock)
@@ -49,6 +48,7 @@ func main() {
 			os.Exit(1)
 		}
 
+		// Receive from the client and send to the remote
 		buf := make([]byte, 1024)
 		n, _, _, _, err := syscall.Recvmsg(nfd, buf, nil, 0)
 		if err != nil {
@@ -56,6 +56,16 @@ func main() {
 			os.Exit(1)
 		}
 		syscall.Sendmsg(srvSock, buf[:n], nil, srvSockAddr, 0)
+
+		// Receive from the remote and send back to the client
+		buf = make([]byte, 1024)
+		n, _, _, from, err := syscall.Recvmsg(srvSock, buf, nil, 0)
+		if err != nil {
+			fmt.Printf("proxy: error receiving message: %s\n", err)
+			os.Exit(1)
+		}
+		syscall.Sendmsg(nfd, buf[:n], nil, from, 0)
+
 		syscall.Close(nfd)
 	}
 }
