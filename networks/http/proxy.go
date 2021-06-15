@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"strings"
 	"syscall"
 )
 
@@ -12,6 +13,7 @@ const PORT = 8000
 var localhost = [4]byte{127, 0, 0, 1}
 
 func main() {
+	cache := make(map[string][]byte)
 	sock, err := syscall.Socket(syscall.AF_INET, syscall.SOCK_STREAM, 0)
 	if err != nil {
 		fmt.Printf("proxy: could not open socket: %s\n", err)
@@ -48,18 +50,32 @@ func main() {
 			os.Exit(1)
 		}
 
-		// Receive from the client and send to the remote
-		buf := make([]byte, 1024)
-		n, _, _, _ := recv(nfd, buf, nil, 0)
-		send(srvSock, buf[:n], nil, srvSockAddr, 0)
+		req := make([]byte, 1024)
+		resp := make([]byte, 1024)
 
-		// Receive from the remote and send back to the client
-		buf = make([]byte, 1024)
-		n, _, _, from := recv(srvSock, buf, nil, 0)
-		send(nfd, buf[:n], nil, from, 0)
+		// Receive from the client
+		n, _, _, _ := recv(nfd, req, nil, 0)
+		req = req[:n]
+		path := getPath(req)
+		if cachedResp, ok := cache[path]; !ok {
+			fmt.Printf("Cache miss, requesting %s from server\n", path)
+			send(srvSock, req, nil, srvSockAddr, 0)
+			n, _, _, _ = recv(srvSock, resp, nil, 0)
+			resp = resp[:n]
+			cache[path] = resp
+		} else {
+			resp = cachedResp
+		}
+		// Send back to the client
+		send(nfd, resp, nil, nil, 0)
 
 		syscall.Close(nfd)
 	}
+}
+
+func getPath(req []byte) string {
+	reqline := strings.Split(string(req), "\n")[0]
+	return strings.Split(reqline, " ")[1]
 }
 
 func recv(fd int, p, oob []byte, flags int) (n, oobn int, recvflags int, from syscall.Sockaddr) {
