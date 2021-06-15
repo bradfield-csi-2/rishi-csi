@@ -12,8 +12,6 @@ const PORT = 8000
 var localhost = [4]byte{127, 0, 0, 1}
 
 func main() {
-	fmt.Printf("This will be a reverse proxy.\n")
-
 	sock, err := syscall.Socket(syscall.AF_INET, syscall.SOCK_STREAM, 0)
 	if err != nil {
 		fmt.Printf("proxy: could not open socket: %s\n", err)
@@ -32,19 +30,32 @@ func main() {
 		fmt.Printf("proxy: could not listen on port %d: %s\n", PORT, err)
 		os.Exit(1)
 	}
-	nfd, _, err := syscall.Accept(sock)
+	fmt.Printf("Listening on port %d...\n", PORT)
+
+	// Open a socket and connect to a "remote" server for forwarding
+	srvSock, _ := syscall.Socket(syscall.AF_INET, syscall.SOCK_STREAM, 0)
+	srvSockAddr := &syscall.SockaddrInet4{Addr: localhost, Port: 1234}
+	err = syscall.Connect(srvSock, srvSockAddr)
 	if err != nil {
-		fmt.Printf("proxy: could not accept on port %d: %s\n", PORT, err)
+		fmt.Printf("proxy: could not connect to remote server: %s\n", err)
 		os.Exit(1)
 	}
+	defer syscall.Close(srvSock)
 
 	for {
+		nfd, _, err := syscall.Accept(sock)
+		if err != nil {
+			fmt.Printf("proxy: could not accept on port %d: %s\n", PORT, err)
+			os.Exit(1)
+		}
+
 		buf := make([]byte, 1024)
-		n, _, _, from, err := syscall.Recvmsg(nfd, buf, nil, 0)
+		n, _, _, _, err := syscall.Recvmsg(nfd, buf, nil, 0)
 		if err != nil {
 			fmt.Printf("proxy: error receiving message: %s\n", err)
 			os.Exit(1)
 		}
-		syscall.Sendmsg(nfd, buf[:n], nil, from, 0)
+		syscall.Sendmsg(srvSock, buf[:n], nil, srvSockAddr, 0)
+		syscall.Close(nfd)
 	}
 }
