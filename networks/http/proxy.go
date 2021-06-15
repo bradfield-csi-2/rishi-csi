@@ -50,22 +50,31 @@ func main() {
 
 		// Receive from the client and send to the remote
 		buf := make([]byte, 1024)
-		n, _, _, _, err := syscall.Recvmsg(nfd, buf, nil, 0)
-		if err != nil {
-			fmt.Printf("proxy: error receiving message: %s\n", err)
-			os.Exit(1)
-		}
-		syscall.Sendmsg(srvSock, buf[:n], nil, srvSockAddr, 0)
+		n, _, _, _ := recv(nfd, buf, nil, 0)
+		send(srvSock, buf[:n], nil, srvSockAddr, 0)
 
 		// Receive from the remote and send back to the client
 		buf = make([]byte, 1024)
-		n, _, _, from, err := syscall.Recvmsg(srvSock, buf, nil, 0)
-		if err != nil {
-			fmt.Printf("proxy: error receiving message: %s\n", err)
-			os.Exit(1)
-		}
-		syscall.Sendmsg(nfd, buf[:n], nil, from, 0)
+		n, _, _, from := recv(srvSock, buf, nil, 0)
+		send(nfd, buf[:n], nil, from, 0)
 
 		syscall.Close(nfd)
+	}
+}
+
+func recv(fd int, p, oob []byte, flags int) (n, oobn int, recvflags int, from syscall.Sockaddr) {
+	n, oobn, recvflags, from, err := syscall.Recvmsg(fd, p, oob, flags)
+	if err != nil {
+		fmt.Printf("proxy: error receiving message: %s\n", err)
+		os.Exit(1)
+	}
+	return
+}
+
+func send(fd int, p, oob []byte, to syscall.Sockaddr, flags int) {
+	err := syscall.Sendmsg(fd, p, oob, to, flags)
+	if err != nil {
+		fmt.Printf("proxy: error sending message: %s\n", err)
+		os.Exit(1)
 	}
 }
