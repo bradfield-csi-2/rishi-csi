@@ -12,7 +12,11 @@ import (
 	"syscall"
 )
 
-const PING_REQ_TYPE = 8
+const (
+	MAX_HOPS         = 64
+	PING_REQ_TYPE    = 8
+	RESP_BUFFER_SIZE = 1024
+)
 
 type ICMPHeader struct {
 	Type       byte
@@ -37,16 +41,30 @@ func main() {
 	err = syscall.Bind(fd, &syscall.SockaddrInet4{})
 	check(err)
 
-	req := newICMPRequest(0)
-	syscall.Sendto(fd, req, 0, dest)
+	var hop int = 1
+	for hop < MAX_HOPS {
+		req := newICMPRequest(hop)
+		syscall.SetsockoptInt(fd, syscall.IPPROTO_IP, syscall.IP_TTL, hop)
+		syscall.Sendto(fd, req, 0, dest)
+		resp := make([]byte, RESP_BUFFER_SIZE)
+		n, _, err := syscall.Recvfrom(fd, resp, 0)
+		check(err)
+		resp = resp[:n]
+		fmt.Printf("%d\t%s\n", hop, formatIp(resp[12:16]))
+		hop++
+	}
 }
 
-func newICMPRequest(seqNum uint16) []byte {
+func formatIp(rawIp []byte) string {
+	return fmt.Sprintf("%d.%d.%d.%d", rawIp[0], rawIp[1], rawIp[2], rawIp[3])
+}
+
+func newICMPRequest(seqNum int) []byte {
 	h := &ICMPHeader{
 		Type:       PING_REQ_TYPE,
 		Code:       0,
 		Identifier: uint16(rand.Uint32()),
-		SeqNumber:  seqNum,
+		SeqNumber:  uint16(seqNum),
 	}
 	h.calculateChecksum()
 	buf := new(bytes.Buffer)
