@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"encoding/binary"
+	"flag"
 	"fmt"
 	"math/rand"
 	"net"
@@ -39,8 +40,9 @@ func (h *ICMPHeader) calculateChecksum() {
 
 func main() {
 	fmt.Printf("Traceroute\n")
-	host := "google.com"
-	dest := &syscall.SockaddrInet4{Addr: getIPFromHost(host)}
+	host := flag.String("h", "", "host name to trace")
+	flag.Parse()
+	dest := &syscall.SockaddrInet4{Addr: getIPFromHost(*host)}
 
 	fd, err := syscall.Socket(syscall.AF_INET, syscall.SOCK_RAW, syscall.IPPROTO_ICMP)
 	check(err)
