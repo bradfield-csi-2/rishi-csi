@@ -10,12 +10,14 @@ import (
 	"strconv"
 	"strings"
 	"syscall"
+	"time"
 )
 
 const (
 	MAX_HOPS         = 64
 	PING_REQ_TYPE    = 8
 	RESP_BUFFER_SIZE = 1024
+	TIMEOUT          = time.Duration(5) * time.Second
 )
 
 type ICMPHeader struct {
@@ -33,24 +35,36 @@ func (h *ICMPHeader) calculateChecksum() {
 
 func main() {
 	fmt.Printf("Traceroute\n")
-	host := "lichess.org"
-	dest := &syscall.SockaddrInet4{Addr: getIPFromHost(host)}
+	host := "google.com"
+	dest := &syscall.SockaddrInet4{Addr: getIPFromHost(host), Port: 33434}
 
 	fd, err := syscall.Socket(syscall.AF_INET, syscall.SOCK_RAW, syscall.IPPROTO_ICMP)
+	check(err)
+	err = syscall.SetNonblock(fd, true)
 	check(err)
 	err = syscall.Bind(fd, &syscall.SockaddrInet4{})
 	check(err)
 
 	var hop int = 1
 	for hop < MAX_HOPS {
+		probeStart := time.Now()
 		req := newICMPRequest(hop)
 		syscall.SetsockoptInt(fd, syscall.IPPROTO_IP, syscall.IP_TTL, hop)
 		syscall.Sendto(fd, req, 0, dest)
 		resp := make([]byte, RESP_BUFFER_SIZE)
-		n, _, err := syscall.Recvfrom(fd, resp, 0)
-		check(err)
-		resp = resp[:n]
-		fmt.Printf("%d\t%s\n", hop, formatIp(resp[12:16]))
+		for {
+			n, _, err := syscall.Recvfrom(fd, resp, 0)
+			if err == nil {
+				resp = resp[:n]
+				rtt := time.Since(probeStart)
+				fmt.Printf("%d\t%s\t%v\n", hop, formatIp(resp[12:16]), rtt)
+				break
+			}
+			if time.Since(probeStart) > TIMEOUT {
+				fmt.Printf("%d\t%s\n", hop, "*")
+				break
+			}
+		}
 		hop++
 	}
 }
