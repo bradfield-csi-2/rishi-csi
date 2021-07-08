@@ -14,7 +14,11 @@ import (
 )
 
 const (
+	IP_HEADER_LENGTH = 20
 	MAX_HOPS         = 64
+	PING_REPLY_CODE  = 0
+	PING_REPLY_TYPE  = 0
+	PING_REQ_CODE    = 0
 	PING_REQ_TYPE    = 8
 	RESP_BUFFER_SIZE = 1024
 	TIMEOUT          = time.Duration(5) * time.Second
@@ -36,7 +40,7 @@ func (h *ICMPHeader) calculateChecksum() {
 func main() {
 	fmt.Printf("Traceroute\n")
 	host := "google.com"
-	dest := &syscall.SockaddrInet4{Addr: getIPFromHost(host), Port: 33434}
+	dest := &syscall.SockaddrInet4{Addr: getIPFromHost(host)}
 
 	fd, err := syscall.Socket(syscall.AF_INET, syscall.SOCK_RAW, syscall.IPPROTO_ICMP)
 	check(err)
@@ -56,6 +60,7 @@ func main() {
 			n, _, err := syscall.Recvfrom(fd, resp, 0)
 			if err == nil {
 				resp = resp[:n]
+				//fmt.Printf("Length: %d\n% x\n", n, resp)
 				rtt := time.Since(probeStart)
 				fmt.Printf("%d\t%s\t%v\n", hop, formatIp(resp[12:16]), rtt)
 				break
@@ -65,8 +70,18 @@ func main() {
 				break
 			}
 		}
+		if isLastHop(resp[IP_HEADER_LENGTH:]) {
+			break
+		}
 		hop++
 	}
+}
+
+func isLastHop(resp []byte) bool {
+	header := new(ICMPHeader)
+	buf := bytes.NewReader(resp)
+	binary.Read(buf, binary.BigEndian, header)
+	return header.Type == PING_REPLY_TYPE && header.Code == PING_REPLY_CODE
 }
 
 func formatIp(rawIp []byte) string {
@@ -76,7 +91,7 @@ func formatIp(rawIp []byte) string {
 func newICMPRequest(seqNum int) []byte {
 	h := &ICMPHeader{
 		Type:       PING_REQ_TYPE,
-		Code:       0,
+		Code:       PING_REQ_CODE,
 		Identifier: uint16(rand.Uint32()),
 		SeqNumber:  uint16(seqNum),
 	}
