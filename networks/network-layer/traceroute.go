@@ -42,48 +42,43 @@ func main() {
 	fmt.Printf("Traceroute\n")
 	host := flag.String("h", "", "host name to trace")
 	flag.Parse()
-	dest := &syscall.SockaddrInet4{Addr: getIPFromHost(*host)}
+	destIp := getIPFromHost(*host)
+	dest := &syscall.SockaddrInet4{Addr: destIp, Port: 33434}
 
-	fd, err := syscall.Socket(syscall.AF_INET, syscall.SOCK_RAW, syscall.IPPROTO_ICMP)
+	sendSock, err := syscall.Socket(syscall.AF_INET, syscall.SOCK_RAW, syscall.IPPROTO_ICMP)
 	check(err)
-	err = syscall.SetNonblock(fd, true)
+	recvSock, err := syscall.Socket(syscall.AF_INET, syscall.SOCK_RAW, syscall.IPPROTO_ICMP)
 	check(err)
-	err = syscall.Bind(fd, &syscall.SockaddrInet4{})
+	err = syscall.SetsockoptTimeval(recvSock, syscall.SOL_SOCKET, syscall.SO_RCVTIMEO, &syscall.Timeval{Sec: 5})
 	check(err)
 
-	var hop int = 1
-	for hop < MAX_HOPS {
+	ip := ""
+	for hop := 1; hop < MAX_HOPS; hop++ {
 		probeStart := time.Now()
 		req := newICMPRequest(hop)
-		syscall.SetsockoptInt(fd, syscall.IPPROTO_IP, syscall.IP_TTL, hop)
-		syscall.Sendto(fd, req, 0, dest)
+		syscall.SetsockoptInt(sendSock, syscall.IPPROTO_IP, syscall.IP_TTL, hop)
+		syscall.Sendto(sendSock, req, 0, dest)
 		resp := make([]byte, RESP_BUFFER_SIZE)
 		for {
-			n, _, err := syscall.Recvfrom(fd, resp, 0)
+			n, _, err := syscall.Recvfrom(recvSock, resp, 0)
 			if err == nil {
 				resp = resp[:n]
-				//fmt.Printf("Length: %d\n% x\n", n, resp)
 				rtt := time.Since(probeStart)
-				fmt.Printf("%d\t%s\t%v\n", hop, formatIp(resp[12:16]), rtt)
+				ip = formatIp(resp[12:16])
+				fmt.Printf("%d\t%s\t%v\n", hop, ip, rtt)
 				break
-			}
-			if time.Since(probeStart) > TIMEOUT {
+			} else {
 				fmt.Printf("%d\t%s\n", hop, "*")
 				break
 			}
 		}
-		if isLastHop(resp[IP_HEADER_LENGTH:]) {
+		// Since we just get ping replies instead of "Port Unreachable" errors
+		// because we're using raw sockets, we have to check that the current IP is
+		// the destination IP
+		if ip == formatIp(destIp[:]) {
 			break
 		}
-		hop++
 	}
-}
-
-func isLastHop(resp []byte) bool {
-	header := new(ICMPHeader)
-	buf := bytes.NewReader(resp)
-	binary.Read(buf, binary.BigEndian, header)
-	return header.Type == PING_REPLY_TYPE && header.Code == PING_REPLY_CODE
 }
 
 func formatIp(rawIp []byte) string {
