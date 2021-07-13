@@ -4,7 +4,12 @@ import (
 	"math/rand"
 )
 
-const MAX_LEVEL = 16
+const (
+	MAX_LEVEL  = 16
+	MAX_STRING = "~"
+)
+
+var NIL = &skipListNode{item: Item{Key: MAX_STRING}}
 
 type skipListNode struct {
 	item    Item
@@ -18,47 +23,23 @@ type skipListOC struct {
 }
 
 func newSkipListOC() *skipListOC {
-	header := &skipListNode{forward: [MAX_LEVEL]*skipListNode{newSkipListNode(1, "~", "~")}}
 	return &skipListOC{
 		p:      0.25,
 		level:  1,
-		header: header,
+		header: newSkipListNode("", ""),
 	}
 }
 
-func newSkipListNode(level int, key, value string) *skipListNode {
-	return &skipListNode{
-		item:    Item{Key: key, Value: value},
-		forward: [MAX_LEVEL]*skipListNode{},
+func newSkipListNode(key, value string) *skipListNode {
+	node := &skipListNode{item: Item{key, value}}
+	for i := 0; i < MAX_LEVEL; i++ {
+		node.forward[i] = NIL
 	}
+	return node
 }
 
-func (o *skipListOC) search(key string) (*skipListNode, bool) {
-	x := o.header
-	for i := o.level - 1; i >= 0; i-- {
-		for x.forward[i].item.Key < key {
-			x = x.forward[i]
-		}
-	}
-	x = x.forward[0]
-	if x.item.Key == key {
-		return x, true
-	}
-	return nil, false
-}
-
-func (o *skipListOC) Get(key string) (string, bool) {
-	x, ok := o.search(key)
-	if ok {
-		return x.item.Value, true
-	}
-	return "", false
-}
-
-func (o *skipListOC) Put(key, value string) bool {
-	update := [16]*skipListNode{}
-
-	// Search for key
+func (o *skipListOC) search(key string) (*skipListNode, [MAX_LEVEL]*skipListNode) {
+	update := [MAX_LEVEL]*skipListNode{}
 	x := o.header
 	for i := o.level - 1; i >= 0; i-- {
 		for x.forward[i].item.Key < key {
@@ -67,8 +48,21 @@ func (o *skipListOC) Put(key, value string) bool {
 		update[i] = x
 	}
 	x = x.forward[0]
+	return x, update
+}
 
-	// Key found, overwrite
+func (o *skipListOC) Get(key string) (string, bool) {
+	x, _ := o.search(key)
+	if x.item.Key == key {
+		return x.item.Value, true
+	}
+	return "", false
+}
+
+func (o *skipListOC) Put(key, value string) bool {
+	x, update := o.search(key)
+
+	// Key found, update
 	if x.item.Key == key {
 		x.item.Value = value
 		return false
@@ -82,7 +76,7 @@ func (o *skipListOC) Put(key, value string) bool {
 		}
 		o.level = level
 	}
-	x = newSkipListNode(level, key, value)
+	x = newSkipListNode(key, value)
 	for i := 0; i < level; i++ {
 		x.forward[i] = update[i].forward[i]
 		update[i].forward[i] = x
@@ -91,19 +85,9 @@ func (o *skipListOC) Put(key, value string) bool {
 }
 
 func (o *skipListOC) Delete(key string) bool {
-	update := make([]*skipListNode, 10)
+	x, update := o.search(key)
 
-	// Search for key
-	x := o.header
-	for i := o.level - 1; i >= 0; i-- {
-		for x.forward[i].item.Key < key {
-			x = x.forward[i]
-		}
-		update[i] = x
-	}
-	x = x.forward[0]
-
-	// Key nout found, bail
+	// Key not found, bail
 	if x.item.Key != key {
 		return false
 	}
@@ -115,7 +99,7 @@ func (o *skipListOC) Delete(key string) bool {
 		}
 		update[i].forward[i] = x.forward[i]
 	}
-	for o.level > 1 && o.header.forward[o.level] == nil {
+	for o.level > 1 && o.header.forward[o.level-1] == NIL {
 		o.level--
 	}
 	return true
