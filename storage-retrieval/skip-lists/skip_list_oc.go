@@ -114,23 +114,28 @@ func (o *skipListOC) randomLevel() int {
 }
 
 func (o *skipListOC) RangeScan(startKey, endKey string) Iterator {
-	return &skipListOCIterator{}
+	node, _ := o.search(startKey)
+	return &skipListOCIterator{o, node, startKey, endKey}
 }
 
 type skipListOCIterator struct {
+	o                *skipListOC
+	node             *skipListNode
+	startKey, endKey string
 }
 
 func (iter *skipListOCIterator) Next() {
+	iter.node = iter.node.forward[0]
 }
 
 func (iter *skipListOCIterator) Valid() bool {
-	return false
+	return iter.node.item.Key <= iter.endKey
 }
 
 func (iter *skipListOCIterator) Key() string {
-	return ""
+	return iter.node.item.Key
 }
 
 func (iter *skipListOCIterator) Value() string {
-	return ""
+	return iter.node.item.Value
 }
