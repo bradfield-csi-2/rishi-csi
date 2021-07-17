@@ -2,7 +2,6 @@ package main
 
 import (
 	"encoding/binary"
-	"hash"
 	"hash/fnv"
 	"math/bits"
 )
@@ -21,41 +20,46 @@ type bloomFilter interface {
 type BloomFilter struct {
 	data       []byte
 	sizeInBits uint64
-	k          int
-	hashFns    []hash.Hash64
+	k          uint64
 }
 
-// |/usr/share/dict/words| = 235886
+// Size of /usr/share/dict/words = 235886
+// Loading every other word, N ~= 117943
+// For m = 1600000 bits, optimal k = 1600000/117943 * ln(2) = 9
 func newBloomFilter() *BloomFilter {
-	size := uint64(100000)
+	size := uint64(200000)
 	return &BloomFilter{
 		data:       make([]byte, size),
 		sizeInBits: size * 8,
-		k:          2,
-		hashFns:    []hash.Hash64{fnv.New64(), fnv.New64a()},
+		k:          9,
 	}
 }
 
 func (b *BloomFilter) add(item string) {
-	for _, h := range b.hashFns {
-		h.Write([]byte(item))
-		sum := h.Sum64()
+	h1 := fnv.New64()
+	h2 := fnv.New64a()
+	h1.Write([]byte(item))
+	h2.Write([]byte(item))
+	for k := uint64(0); k < b.k; k++ {
+		// Use hash mixing from Kirsch 2006
+		// https://www.eecs.harvard.edu/~michaelm/postscripts/rsa2008.pdf
+		sum := h1.Sum64() + k*h2.Sum64()
 		// Get overall bit position in array of bits
 		// Then split into array index and remainder
 		quo, rem := bits.Div64(0, sum%(b.sizeInBits), 8)
 		// Remainder is the bit offset into that byte
 		// Turn on that bit in the byte
 		b.data[quo] |= (1 << rem)
-
-		h.Reset()
 	}
 }
 
 func (b *BloomFilter) maybeContains(item string) bool {
-	for _, h := range b.hashFns {
-		h.Write([]byte(item))
-		sum := h.Sum64()
-		h.Reset()
+	h1 := fnv.New64()
+	h2 := fnv.New64a()
+	h1.Write([]byte(item))
+	h2.Write([]byte(item))
+	for k := uint64(0); k < b.k; k++ {
+		sum := h1.Sum64() + k*h2.Sum64()
 		quo, rem := bits.Div64(0, sum%(b.sizeInBits), 8)
 		if b.data[quo]&(1<<rem) == 0 {
 			return false
