@@ -16,8 +16,8 @@ type Item struct {
 func Build(path string, sortedItems []Item) error {
 	data := new(bytes.Buffer)
 	index := new(bytes.Buffer)
-	var dataOffset uint16 = 0
-	var indexLen uint16 = 0
+	var dataOffset uint64 = 0
+	var indexLen uint64 = 0
 	var err error
 	for _, item := range sortedItems {
 		keyLen := uint16(len(item.Key))
@@ -42,8 +42,8 @@ func Build(path string, sortedItems []Item) error {
 			return err
 		}
 
-		indexLen += (keyLen + 6)
-		dataOffset += valLen
+		indexLen += uint64(keyLen + 12)
+		dataOffset += uint64(valLen)
 	}
 	file := new(bytes.Buffer)
 	// Place the length of the index as the first two bytes in the file, then
@@ -73,14 +73,14 @@ func Build(path string, sortedItems []Item) error {
 // Although a Table shouldn't keep all the key/value data in memory, it should contain
 // some metadata to help with efficient access (e.g. size, index, optional Bloom filter).
 type Table struct {
-	indexLen uint16
+	indexLen uint64
 	index    map[string]IndexEntry
 	keys     []string
 	file     *os.File
 }
 
 type IndexEntry struct {
-	Offset uint16
+	Offset uint64
 	ValLen uint16
 	KeyLen uint16
 }
@@ -92,35 +92,35 @@ func LoadTable(path string) (*Table, error) {
 	if err != nil {
 		return nil, err
 	}
-	d := make([]byte, 2)
+	d := make([]byte, 8)
 	_, err = f.Read(d)
 	if err != nil {
 		return nil, err
 	}
-	indexLen := binary.BigEndian.Uint16(d)
+	indexLen := binary.BigEndian.Uint64(d)
 
 	indexBytes := make([]byte, indexLen)
-	_, err = f.ReadAt(indexBytes, 2)
+	_, err = f.ReadAt(indexBytes, 8)
 	if err != nil {
 		return nil, err
 	}
 	index := make(map[string]IndexEntry)
 	keys := make([]string, 1)
 
-	var i uint16 = 0
+	var i uint64 = 0
 	for i < indexLen {
 		entry := new(IndexEntry)
-		r := bytes.NewReader(indexBytes[i : i+6])
+		r := bytes.NewReader(indexBytes[i : i+12])
 		err = binary.Read(r, binary.BigEndian, entry)
 		if err != nil {
 			return nil, err
 		}
-		i += 6
+		i += 12
 
-		key := string(indexBytes[i : i+entry.KeyLen])
+		key := string(indexBytes[i : i+uint64(entry.KeyLen)])
 		keys = append(keys, key)
 		index[key] = *entry
-		i += entry.KeyLen
+		i += uint64(entry.KeyLen)
 	}
 
 	t := &Table{
@@ -139,7 +139,7 @@ func (t *Table) Get(key string) (string, bool, error) {
 		return "", false, nil
 	}
 	value := make([]byte, entry.ValLen)
-	_, err := t.file.ReadAt(value, int64(entry.Offset+t.indexLen+2))
+	_, err := t.file.ReadAt(value, int64(entry.Offset+t.indexLen+8))
 	if err != nil {
 		return "", false, err
 	}
