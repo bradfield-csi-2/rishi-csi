@@ -5,6 +5,7 @@ import (
 	"encoding/binary"
 	"io/ioutil"
 	"os"
+	"sort"
 )
 
 type Item struct {
@@ -52,6 +53,7 @@ func Build(path string, sortedItems []Item) error {
 type Table struct {
 	indexLen uint16
 	index    map[string]IndexEntry
+	keys     []string
 	file     *os.File
 }
 
@@ -72,6 +74,7 @@ func LoadTable(path string) (*Table, error) {
 	indexBytes := make([]byte, indexLen)
 	f.ReadAt(indexBytes, 2)
 	index := make(map[string]IndexEntry)
+	keys := make([]string, 1)
 
 	var i uint16 = 0
 	for i < indexLen {
@@ -81,6 +84,7 @@ func LoadTable(path string) (*Table, error) {
 		i += 6
 
 		key := string(indexBytes[i : i+entry.KeyLen])
+		keys = append(keys, key)
 		index[key] = *entry
 		i += entry.KeyLen
 	}
@@ -89,6 +93,7 @@ func LoadTable(path string) (*Table, error) {
 		file:     f,
 		indexLen: indexLen,
 		index:    index,
+		keys:     keys,
 	}
 
 	return t, nil
@@ -105,7 +110,28 @@ func (t *Table) Get(key string) (string, bool, error) {
 }
 
 func (t *Table) RangeScan(startKey, endKey string) (Iterator, error) {
-	return nil, nil
+	index := sort.SearchStrings(t.keys, startKey)
+	return &tableIterator{t, index, endKey}, nil
+}
+
+type tableIterator struct {
+	table  *Table
+	index  int
+	endKey string
+}
+
+func (t *tableIterator) Valid() bool {
+	return t.index < len(t.table.keys) && t.table.keys[t.index] <= t.endKey
+}
+
+func (t *tableIterator) Item() Item {
+	key := t.table.keys[t.index]
+	val, _, _ := t.table.Get(key)
+	return Item{key, val}
+}
+
+func (t *tableIterator) Next() {
+	t.index++
 }
 
 type Iterator interface {
