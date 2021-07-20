@@ -18,6 +18,7 @@ func Build(path string, sortedItems []Item) error {
 	index := new(bytes.Buffer)
 	var dataOffset uint16 = 0
 	var indexLen uint16 = 0
+	var err error
 	for _, item := range sortedItems {
 		keyLen := uint16(len(item.Key))
 		valLen := uint16(len(item.Value))
@@ -26,11 +27,20 @@ func Build(path string, sortedItems []Item) error {
 		// portion of the file, the length of the value, length of the key, and the
 		// key itself
 		entry := &IndexEntry{dataOffset, valLen, keyLen}
-		binary.Write(index, binary.BigEndian, entry)
-		index.WriteString(item.Key)
+		err = binary.Write(index, binary.BigEndian, entry)
+		if err != nil {
+			return err
+		}
+		_, err = index.WriteString(item.Key)
+		if err != nil {
+			return err
+		}
 
 		// Write the value in data portion of file
-		data.WriteString(item.Value)
+		_, err = data.WriteString(item.Value)
+		if err != nil {
+			return err
+		}
 
 		indexLen += (keyLen + 6)
 		dataOffset += valLen
@@ -38,10 +48,22 @@ func Build(path string, sortedItems []Item) error {
 	file := new(bytes.Buffer)
 	// Place the length of the index as the first two bytes in the file, then
 	// write the index and data
-	binary.Write(file, binary.BigEndian, indexLen)
-	file.Write(index.Bytes())
-	file.Write(data.Bytes())
-	ioutil.WriteFile(path, file.Bytes(), 0644)
+	err = binary.Write(file, binary.BigEndian, indexLen)
+	if err != nil {
+		return err
+	}
+	_, err = file.Write(index.Bytes())
+	if err != nil {
+		return err
+	}
+	_, err = file.Write(data.Bytes())
+	if err != nil {
+		return err
+	}
+	err = ioutil.WriteFile(path, file.Bytes(), 0644)
+	if err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -66,13 +88,22 @@ type IndexEntry struct {
 // Prepares a Table for efficient access. This will likely involve reading some metadata
 // in order to populate the fields of the Table struct.
 func LoadTable(path string) (*Table, error) {
-	f, _ := os.Open(path)
+	f, err := os.Open(path)
+	if err != nil {
+		return nil, err
+	}
 	d := make([]byte, 2)
-	f.Read(d)
+	_, err = f.Read(d)
+	if err != nil {
+		return nil, err
+	}
 	indexLen := binary.BigEndian.Uint16(d)
 
 	indexBytes := make([]byte, indexLen)
-	f.ReadAt(indexBytes, 2)
+	_, err = f.ReadAt(indexBytes, 2)
+	if err != nil {
+		return nil, err
+	}
 	index := make(map[string]IndexEntry)
 	keys := make([]string, 1)
 
@@ -80,7 +111,10 @@ func LoadTable(path string) (*Table, error) {
 	for i < indexLen {
 		entry := new(IndexEntry)
 		r := bytes.NewReader(indexBytes[i : i+6])
-		binary.Read(r, binary.BigEndian, entry)
+		err = binary.Read(r, binary.BigEndian, entry)
+		if err != nil {
+			return nil, err
+		}
 		i += 6
 
 		key := string(indexBytes[i : i+entry.KeyLen])
@@ -105,7 +139,10 @@ func (t *Table) Get(key string) (string, bool, error) {
 		return "", false, nil
 	}
 	value := make([]byte, entry.ValLen)
-	t.file.ReadAt(value, int64(entry.Offset+t.indexLen+2))
+	_, err := t.file.ReadAt(value, int64(entry.Offset+t.indexLen+2))
+	if err != nil {
+		return "", false, err
+	}
 	return string(value), true, nil
 }
 
