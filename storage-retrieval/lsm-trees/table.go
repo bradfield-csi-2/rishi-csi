@@ -89,7 +89,6 @@ func check(errs ...error) error {
 type Table struct {
 	index     []string
 	numBlocks uint64
-	keys      []string
 	file      *os.File
 }
 
@@ -110,7 +109,6 @@ func LoadTable(path string) (*Table, error) {
 		return nil, err
 	}
 	index := make([]string, numBlocks)
-	keys := make([]string, 1)
 
 	i := uint64(0)
 	block := 0
@@ -129,7 +127,6 @@ func LoadTable(path string) (*Table, error) {
 		file:      f,
 		index:     index,
 		numBlocks: numBlocks,
-		keys:      keys,
 	}
 
 	return t, nil
@@ -164,28 +161,74 @@ func (t *Table) Get(key string) (string, bool, error) {
 }
 
 func (t *Table) RangeScan(startKey, endKey string) (Iterator, error) {
-	index := sort.SearchStrings(t.keys, startKey)
-	return &tableIterator{t, index, endKey}, nil
+	// Get the block that contains the key
+	startBlock := uint64(sort.SearchStrings(t.index, startKey))
+	block := make([]byte, BLOCK_CAPACITY)
+	t.file.ReadAt(block, int64(startBlock*BLOCK_CAPACITY))
+
+	// Find the block offset where the key starts
+	var i uint16
+	var keyLen uint16
+	var valLen uint16
+	for i < BLOCK_CAPACITY {
+		keyLen = binary.BigEndian.Uint16(block[i : i+2])
+		valLen = binary.BigEndian.Uint16(block[i+2 : i+4])
+		k := string(block[i+4 : i+4+keyLen])
+		if k == startKey {
+			break
+		}
+		i += (4 + keyLen + valLen)
+	}
+
+	return &tableIterator{
+		table:      t,
+		blockIndex: startBlock,
+		block:      block,
+		offset:     i,
+		keyLen:     keyLen,
+		valLen:     valLen,
+		endKey:     endKey,
+		currKey:    startKey,
+	}, nil
 }
 
 type tableIterator struct {
-	table  *Table
-	index  int
-	endKey string
+	table      *Table
+	blockIndex uint64
+	block      []byte
+	offset     uint16
+	keyLen     uint16
+	valLen     uint16
+	endKey     string
+	currKey    string
 }
 
 func (t *tableIterator) Valid() bool {
-	return t.index < len(t.table.keys) && t.table.keys[t.index] <= t.endKey
+	return t.blockIndex < t.table.numBlocks && t.currKey <= t.endKey
 }
 
 func (t *tableIterator) Item() Item {
-	key := t.table.keys[t.index]
-	val, _, _ := t.table.Get(key)
+	keyPos := t.offset + 4
+	valPos := keyPos + t.keyLen
+	key := string(t.block[keyPos:valPos])
+	val := string(t.block[valPos : valPos+t.valLen])
 	return Item{key, val}
 }
 
 func (t *tableIterator) Next() {
-	t.index++
+	t.offset += (t.keyLen + t.valLen + 4)
+	// Check if we're at the end of a block. This occurs if the next byte is 0 or
+	// the offset is exactly equal to the block capacity
+	if t.offset >= BLOCK_CAPACITY || binary.BigEndian.Uint16(t.block[t.offset:t.offset+2]) == 0 {
+		t.blockIndex++
+		t.table.file.ReadAt(t.block, int64(t.blockIndex*BLOCK_CAPACITY))
+		t.offset = 0
+	}
+	// Now store the current offsets and key and val lengths to easily grab an
+	// Item
+	t.keyLen = binary.BigEndian.Uint16(t.block[t.offset : t.offset+2])
+	t.valLen = binary.BigEndian.Uint16(t.block[t.offset+2 : t.offset+4])
+	t.currKey = string(t.block[t.offset+4 : t.offset+4+t.keyLen])
 }
 
 type Iterator interface {
