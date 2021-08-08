@@ -53,7 +53,7 @@ func TestBitmap(t *testing.T) {
 		}
 	}
 
-	/* TODO: Uncomment this section once you get compression / decompression working
+	// TODO: Uncomment this section once you get compression / decompression working
 	compressed := compress(b1)
 	t.Logf("Uncompressed size: %d words, compressed size: %d words\n", len(b1.data), len(compressed))
 	b := decompress(compressed)
@@ -62,5 +62,4 @@ func TestBitmap(t *testing.T) {
 			t.Fatalf("Compression then decompression produced inconsistent result for %d\n", x)
 		}
 	}
-	*/
 }
