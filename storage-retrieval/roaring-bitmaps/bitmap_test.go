@@ -53,7 +53,6 @@ func TestBitmap(t *testing.T) {
 		}
 	}
 
-	/* TODO: Uncomment this section once you get compression / decompression working
 	compressed := compress(b1)
 	t.Logf("Uncompressed size: %d words, compressed size: %d words\n", len(b1.data), len(compressed))
 	b := decompress(compressed)
@@ -62,5 +61,19 @@ func TestBitmap(t *testing.T) {
 			t.Fatalf("Compression then decompression produced inconsistent result for %d\n", x)
 		}
 	}
-	*/
+}
+
+func TestCompress(t *testing.T) {
+	b := newUncompressedBitmap()
+	b.Set(64)
+	// Should see compressed value 100...01 0...01
+	var elem1 uint64 = 0x8000000000000001
+	var elem2 uint64 = 0b10
+	c := compress(b)
+	if c[0] != elem1 {
+		t.Fatalf("First element is not correct, got %#064b, want %#064b\n", c[0], elem1)
+	}
+	if c[1] != elem2 {
+		t.Fatalf("Second element is not correct, got %#064b, want %#064b\n", c[1], elem2)
+	}
 }
