@@ -40,7 +40,7 @@ int main(int argc, char**argv) {
   }
 
   // Clone parent, enter child code
-  if ((child_pid = clone(child, stack + STACK_SIZE, flags | SIGCHLD, &config)) == -1) {
+  if ((child_pid = clone(child, stack + STACK_SIZE, flags | SIGCHLD | CLONE_NEWNET | CLONE_NEWNS, &config)) == -1) {
     fprintf(stderr, "Clone failed");
     exit(2);
   }
