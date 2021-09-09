@@ -1,2 +1,2 @@
 build:
-	gcc -g -o myprogram starter.c
+	gcc -g -o container starter.c
