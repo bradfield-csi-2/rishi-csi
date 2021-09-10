@@ -1,2 +1,2 @@
 build:
-	gcc -g -o container starter.c
+	gcc -g -o container starter.c -lcap
