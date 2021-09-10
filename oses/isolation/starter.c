@@ -1,12 +1,16 @@
 #define _GNU_SOURCE
 #include <sched.h>
-#include <sys/wait.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
+#include <sys/wait.h>
+#include <sys/prctl.h>
+#include <sys/types.h>
+#include <sys/capability.h>
 
 #define MAX_MEM_BYTES   "2M"
 #define MAX_PROCS       5
+#define NUM_CAPS        5
 #define NUM_CONTROLLERS 2
 #define STACK_SIZE      65536
 
@@ -14,6 +18,45 @@ struct child_config {
   int argc;
   char **argv;
 };
+
+int capabilities() {
+  int to_drop[NUM_CAPS] = {
+    CAP_DAC_OVERRIDE,    // Disallow bypassing file permissions
+    CAP_IPC_LOCK,        // Disallow memory locking
+    CAP_SYS_BOOT,        // Disallow use of reboot, kexec_load
+    CAP_SYS_ADMIN,       // Disallow sys admin capabilities
+    CAP_SYS_MODULE       // Disallow loading/unloading kernel modules
+  };
+
+  // Remove capabilities from the bounding set
+  for (int i = 0; i < NUM_CAPS; i++) {
+    // for PR_CAPBSET_DROP, args 3 to 5 are unused
+    if (prctl(PR_CAPBSET_DROP, to_drop[i], 0, 0, 0) == -1) {
+      fprintf(stderr, "Error dropping capability %d", to_drop[i]);
+      return -1;
+    }
+  }
+
+  // Remove inheritable capabilities
+  cap_t caps = cap_get_proc();
+  if (caps == NULL) {
+    fprintf(stderr, "Error getting caps with cap_get_proc()");
+    return -1;
+  }
+
+  if (cap_set_flag(caps, CAP_INHERITABLE, NUM_CAPS, to_drop, CAP_CLEAR) == -1) {
+    fprintf(stderr, "Error setting cap flags with cap_set_flag()");
+    return -1;
+  }
+
+  if (cap_set_proc(caps) == -1) {
+    fprintf(stderr, "Error setting inheritable caps with cap_set_proc()");
+    return -1;
+  }
+  cap_free(caps);
+
+  return 0;
+}
 
 int cgroup(pid_t pid) {
   // TODO: Make and cleanup directories in code instead of manually
@@ -58,6 +101,12 @@ int cgroup(pid_t pid) {
 /* Entry point for child after `clone` */
 int child(void *arg) {
   struct child_config *config = arg;
+
+  // Set capabilities for child process
+  if (capabilities() == -1) {
+    fprintf(stderr, "Setting capabilities failed");
+    return -1;
+  }
 
   // Exec the program
   if (execvpe(config->argv[0], config->argv, NULL)) {
