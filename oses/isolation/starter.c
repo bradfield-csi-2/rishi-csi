@@ -6,6 +6,7 @@
 #include <string.h>
 #include <unistd.h>
 #include <sys/capability.h>
+#include <sys/mount.h>
 #include <sys/prctl.h>
 #include <sys/stat.h>
 #include <sys/types.h>
@@ -108,6 +109,17 @@ int cgroup(pid_t pid) {
   return 0;
 }
 
+int mountfs() {
+  // Disable mount propagation
+  mount(NULL, "/", NULL, MS_REC | MS_PRIVATE, NULL);
+  mount(NULL, "/proc", NULL, MS_REC | MS_PRIVATE, NULL);
+
+  // Mount a new /proc
+  mount("proc", "/proc", "proc", MS_NOSUID|MS_NODEV|MS_NOEXEC, NULL);
+
+  return 0;
+}
+
 /* Entry point for child after `clone` */
 int child(void *arg) {
   struct child_config *config = arg;
@@ -115,6 +127,12 @@ int child(void *arg) {
   // Set capabilities for child process
   if (capabilities() == -1) {
     fprintf(stderr, "Setting capabilities failed");
+    return -1;
+  }
+
+  // Mount
+  if (mountfs() == -1) {
+    fprintf(stderr, "Mount failed");
     return -1;
   }
 
@@ -149,7 +167,7 @@ int main(int argc, char**argv) {
   }
 
   // Clone parent, enter child code
-  if ((child_pid = clone(child, stack + STACK_SIZE, flags | SIGCHLD | CLONE_NEWNET | CLONE_NEWNS, &config)) == -1) {
+  if ((child_pid = clone(child, stack + STACK_SIZE, flags | SIGCHLD | CLONE_NEWNET | CLONE_NEWNS | CLONE_NEWPID, &config)) == -1) {
     fprintf(stderr, "Clone failed");
     exit(2);
   }
