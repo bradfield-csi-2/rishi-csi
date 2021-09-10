@@ -1,12 +1,15 @@
 #define _GNU_SOURCE
+#include <errno.h>
 #include <sched.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <unistd.h>
-#include <sys/wait.h>
-#include <sys/prctl.h>
-#include <sys/types.h>
 #include <sys/capability.h>
+#include <sys/prctl.h>
+#include <sys/stat.h>
+#include <sys/types.h>
+#include <sys/wait.h>
 
 #define MAX_MEM_BYTES   "2M"
 #define MAX_PROCS       5
@@ -59,14 +62,21 @@ int capabilities() {
 }
 
 int cgroup(pid_t pid) {
-  // TODO: Make and cleanup directories in code instead of manually
-
   FILE *f;
+  int status;
   char path[1024];
   char *controllers[NUM_CONTROLLERS] = {"pids", "memory"};
 
-  // Set up controllers by adding this task to the tasks file
+  // Set up controllers by creating directories in /sys/fs/cgroup
+  // and adding this task to the tasks file
   for (int i = 0; i < NUM_CONTROLLERS; i++) {
+    sprintf(path, "/sys/fs/cgroup/%s/container", controllers[i]);
+    status = mkdir(path, S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH);
+    if (status != 0 && errno != EEXIST) {
+      fprintf(stderr, "Could not create directory %s, error: %s", path, strerror(errno));
+      return -1;
+    };
+
     sprintf(path, "/sys/fs/cgroup/%s/container/tasks", controllers[i]);
     f = fopen(path, "w");
     if (f == NULL) {
