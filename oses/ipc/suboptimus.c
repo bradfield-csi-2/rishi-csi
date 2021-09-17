@@ -3,11 +3,58 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <sys/wait.h>
+#include <sys/socket.h>
+#include <sys/un.h>
 #include <unistd.h>
 
 int START = 2, END = 20;
 char *TESTS[] = {"brute_force", "brutish", "miller_rabin"};
 int num_tests = sizeof(TESTS) / sizeof(char *);
+
+int sock() {
+  unsigned int s, s2;
+  struct sockaddr_un local, remote;
+  int len;
+
+  s = socket(AF_UNIX, SOCK_STREAM, 0);
+
+  local.sun_family = AF_UNIX;
+  strcpy(local.sun_path, "/home/ubuntu/mysocket");
+  unlink(local.sun_path);
+  len = strlen(local.sun_path) + sizeof(local.sun_family);
+  bind(s, (struct sockaddr *)&local, len);
+
+  listen(s, 5);
+
+  for(;;) {
+    int done, n;
+    printf("Waiting for a connection...\n");
+    t = sizeof(remote);
+    if ((s2 = accept(s, (struct sockaddr *)&remote, &t)) == -1) {
+      perror("accept");
+      exit(1);
+    }
+
+    printf("Connected.\n");
+
+    done = 0;
+    do {
+      n = recv(s2, str, 100, 0);
+      if (n <= 0) {
+        if (n < 0) perror("recv");
+        done = 1;
+      }
+
+      if (!done)
+        if (send(s2, str, n, 0) < 0) {
+          perror("send");
+          done = 1;
+        }
+    } while (!done);
+
+    close(s2);
+  }
+}
 
 int main(int argc, char *argv[]) {
   int testfds[num_tests][2];
