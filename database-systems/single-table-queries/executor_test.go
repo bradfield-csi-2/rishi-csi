@@ -65,3 +65,67 @@ func TestProjection(t *testing.T) {
 		}
 	}
 }
+
+func TestSortAndLimit(t *testing.T) {
+	lim := 3
+	sortCols := []string{"title"}
+	s := newSeqScanNode()
+	sort := newSortNode(sortCols, s)
+	root := newLimitNode(lim, sort)
+
+	rows := Execute(root)
+
+	firstTitle := "\"Great Performances\" Cats (1998)"
+	if rows[0]["title"] != firstTitle {
+		t.Fatalf("SELECT * FROM movies ORDER BY title LIMIT 3\nReturned title %s as first movie, wanted %s",
+			rows[0]["title"],
+			firstTitle,
+		)
+	}
+
+	if len(rows) != lim {
+		t.Fatalf("SELECT * FROM movies ORDER BY title LIMIT 3\nReturned %d rows, want %d rows",
+			len(rows),
+			lim,
+		)
+	}
+}
+
+func TestSortDescending(t *testing.T) {
+	lim := 3
+	sortCols := []string{"id:desc"}
+	s := newSeqScanNode()
+	sort := newSortNode(sortCols, s)
+	root := newLimitNode(lim, sort)
+
+	rows := Execute(root)
+
+	// This is the last ID by string but not numerically
+	// TODO: Add types to the schema
+	lastId := "99999"
+	if rows[0]["id"] != lastId {
+		t.Fatalf("SELECT * FROM movies ORDER BY id DESC\nReturned title %s as last id, wanted %s",
+			rows[0]["id"],
+			lastId,
+		)
+	}
+}
+
+func TestSortMultipleCols(t *testing.T) {
+	sortCols := []string{"genres:asc", "title:desc"}
+	projCols := []string{"title", "genres"}
+	s := newSeqScanNode()
+	sort := newSortNode(sortCols, s)
+	root := newProjectionNode(projCols, sort)
+
+	rows := Execute(root)
+
+	firstGenre := "(no genres listed)"
+	lastTitle := "Zanjeer (1973)"
+	if rows[0]["genres"] != firstGenre || rows[0]["title"] != lastTitle {
+		t.Fatalf("SELECT title, genres FROM movies ORDER BY genres, title DESC\nReturned first movie %v, wanted %v",
+			rows[0],
+			map[string]string{"title": lastTitle, "genre": firstGenre},
+		)
+	}
+}

@@ -4,12 +4,22 @@ import (
 	"encoding/csv"
 	"fmt"
 	"os"
+	"sort"
+	"strings"
 )
 
 type row map[string]string
 
 type Node interface {
 	Next() row
+}
+
+type SortNode struct {
+	sortCols []string
+	data     []row
+	nRows    int
+	child    Node
+	cursor   int
 }
 
 type ProjectionNode struct {
@@ -36,6 +46,10 @@ type SeqScanNode struct {
 }
 
 type PredFn func(row) bool
+
+func newSortNode(sortCols []string, child Node) *SortNode {
+	return &SortNode{sortCols: sortCols, data: nil, child: child}
+}
 
 func newProjectionNode(cols []string, child Node) *ProjectionNode {
 	return &ProjectionNode{cols: cols, child: child}
@@ -74,6 +88,54 @@ func newSeqScanNode() *SeqScanNode {
 		cursor: 0,
 		child:  nil,
 	}
+}
+
+func (s *SortNode) Next() row {
+	// Gather up all the records from the node below if we haven't sorted yet
+	if s.data == nil {
+		rows := make([]row, 0)
+		for r := s.child.Next(); r != nil; r = s.child.Next() {
+			rows = append(rows, r)
+		}
+		sort.Slice(rows, func(i, j int) bool {
+			var val bool
+			for _, sortCol := range s.sortCols {
+				parts := strings.Split(sortCol, ":")
+				col := parts[0]
+				sortAsc := true
+				if len(parts) > 1 && parts[1] == "desc" {
+					sortAsc = false
+				}
+				if sortAsc {
+					if rows[i][col] < rows[j][col] {
+						return true
+					}
+					if rows[i][col] > rows[j][col] {
+						return false
+					}
+				} else {
+					if rows[i][col] > rows[j][col] {
+						return true
+					}
+					if rows[i][col] < rows[j][col] {
+						return false
+					}
+				}
+			}
+			return val
+		})
+		s.data = rows
+		s.nRows = len(rows)
+	}
+
+	if s.cursor >= s.nRows {
+		return nil
+	}
+
+	// Now cursor through the sorted results
+	row := s.data[s.cursor]
+	s.cursor++
+	return row
 }
 
 func (p *ProjectionNode) Next() row {
@@ -124,8 +186,7 @@ func Execute(root Node) []row {
 }
 
 func main() {
-	// Sample Query
-	fmt.Println("Sample Query\n\nExecuting: SELECT title FROM movies WHERE id = 5000")
+	fmt.Println("Sample Query 1\n==============\nExecuting: SELECT title FROM movies WHERE id = 5000")
 
 	id := "5000"
 	pred := func(r row) bool {
@@ -137,6 +198,21 @@ func main() {
 	root := newProjectionNode(cols, sel)
 
 	rows := Execute(root)
+	for _, row := range rows {
+		fmt.Printf("%+v\n", row)
+	}
+
+	fmt.Println()
+	fmt.Println("Sample Query 2\n==============\nExecuting: SELECT title, genres FROM movies ORDER BY genres, title DESC LIMIT 3")
+
+	sortCols := []string{"genres:asc", "title:desc"}
+	projCols := []string{"title", "genres"}
+	s = newSeqScanNode()
+	sort := newSortNode(sortCols, s)
+	l := newLimitNode(3, sort)
+	root = newProjectionNode(projCols, l)
+
+	rows = Execute(root)
 	for _, row := range rows {
 		fmt.Printf("%+v\n", row)
 	}
