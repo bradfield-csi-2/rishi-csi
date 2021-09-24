@@ -26,7 +26,22 @@ type SeqScanNode struct {
 type LimitNode struct {
 	limit  int
 	cursor int
-	child  *SeqScanNode
+	child  *SelectionNode
+}
+
+type SelectionNode struct {
+	pred  PredFn
+	child *SeqScanNode
+}
+
+type PredFn func(*movie) bool
+
+func newLimitNode(limit int, child *SelectionNode) *LimitNode {
+	return &LimitNode{limit: limit, cursor: 0, child: child}
+}
+
+func newSelectionNode(pred PredFn, child *SeqScanNode) *SelectionNode {
+	return &SelectionNode{pred: pred, child: child}
 }
 
 func newSeqScanNode() *SeqScanNode {
@@ -55,14 +70,19 @@ func newSeqScanNode() *SeqScanNode {
 	}
 }
 
-func newLimitNode(limit int, child *SeqScanNode) *LimitNode {
-	return &LimitNode{limit: limit, cursor: 0, child: child}
-}
-
 func (l *LimitNode) Next() *movie {
 	if l.cursor < l.limit {
 		l.cursor++
 		return l.child.Next()
+	}
+	return nil
+}
+
+func (s *SelectionNode) Next() *movie {
+	for m := s.child.Next(); m != nil; m = s.child.Next() {
+		if s.pred(m) {
+			return m
+		}
 	}
 	return nil
 }
@@ -78,10 +98,25 @@ func (s *SeqScanNode) Next() *movie {
 }
 
 func main() {
-	fmt.Println("Executing: SELECT * FROM test LIMIT 5")
+	// First Test Query
+	fmt.Println("Executing: SELECT * FROM movies LIMIT 5")
+	pred := func(m *movie) bool {
+		return true
+	}
 	s := newSeqScanNode()
-	l := newLimitNode(5, s)
+	sel := newSelectionNode(pred, s)
+	l := newLimitNode(5, sel)
 	for row := l.Next(); row != nil; row = l.Next() {
+		fmt.Printf("%+v\n", row)
+	}
+
+	// Second Test Query
+	fmt.Println("\nExecuting: SELECT * FROM movies WHERE id = 5000")
+	pred = func(m *movie) bool {
+		return m.movieId == "5000"
+	}
+	sel2 := newSelectionNode(pred, s)
+	for row := sel2.Next(); row != nil; row = sel2.Next() {
 		fmt.Printf("%+v\n", row)
 	}
 }
