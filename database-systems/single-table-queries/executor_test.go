@@ -18,20 +18,50 @@ func TestLimit(t *testing.T) {
 }
 
 func TestSelection(t *testing.T) {
-	pred := func(m *movie) bool {
-		return m.movieId == "5000"
-	}
 	id := "5000"
+	pred := func(r row) bool {
+		return r["id"] == id
+	}
 	s := newSeqScanNode()
 	root := newSelectionNode(pred, s)
 
 	rows := Execute(root)
 	movie := rows[0]
 
-	if movie.movieId != id {
+	if movie["id"] != id {
 		t.Fatalf("SELECT * FROM movies WHERE id = 5000\nReturned id %s, wanted movieId %s",
-			movie.movieId,
+			movie["id"],
 			id,
 		)
+	}
+}
+
+func TestProjection(t *testing.T) {
+	id := "5000"
+	pred := func(r row) bool {
+		return r["id"] == id
+	}
+	cols := []string{"title"}
+	s := newSeqScanNode()
+	sel := newSelectionNode(pred, s)
+	root := newProjectionNode(cols, sel)
+
+	rows := Execute(root)
+	movie := rows[0]
+
+	for key := range movie {
+		found := false
+		for _, col := range cols {
+			if key == col {
+				found = true
+			}
+		}
+
+		if !found {
+			t.Fatalf("SELECT title FROM movies WHERE id = 5000\nReturned map %v, wanted %v",
+				movie,
+				map[string]string{"title": "Medium Cool (1969)"},
+			)
+		}
 	}
 }
