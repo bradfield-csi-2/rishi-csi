@@ -60,6 +60,14 @@ type Writer struct {
 	relation string
 }
 
+type Reader struct {
+	heapFile    *HeapFile
+	relation    string
+	currPage    *Page
+	currPageNum int64
+	currSlot    int
+}
+
 type HeapFile struct {
 	file     *os.File
 	pages    []*Page
@@ -88,6 +96,22 @@ func newWriter(relName string) *Writer {
 
 	h := newHeapFile(f)
 	return &Writer{heapFile: h, relation: relName}
+}
+
+func newReader(relName string) *Reader {
+	f, err := os.Open(relName)
+	if err != nil {
+		return nil
+	}
+
+	h := newHeapFile(f)
+	return &Reader{
+		heapFile:    h,
+		relation:    relName,
+		currPage:    nil,
+		currPageNum: 0,
+		currSlot:    0,
+	}
 }
 
 func newHeapFile(f *os.File) *HeapFile {
@@ -147,6 +171,43 @@ func (w *Writer) Write(r row) {
 
 	w.heapFile.file.WriteAt(headerBytes, pageStartOffset)
 	w.heapFile.file.WriteAt(rowBytes, byteOffsetInFile)
+}
+
+func (r *Reader) Read() []byte {
+	p := r.currPage
+	pageStartOffset := r.currPageNum * PAGE_SIZE
+
+	// If page is empty, read it into memory
+	if p == nil {
+		b := make([]byte, PAGE_SIZE)
+		_, err := r.heapFile.file.ReadAt(b, pageStartOffset)
+		if err != nil {
+			return nil
+		}
+		numEntries := binary.LittleEndian.Uint16(b[0:2])
+		startFreeSpace := binary.LittleEndian.Uint16(b[2:4])
+		endFreeSpace := binary.LittleEndian.Uint16(b[4:6])
+		slotArray := make([]Slot, 0)
+		for i := 6; i < len(b); i += 4 {
+			size := binary.LittleEndian.Uint16(b[i : i+2])
+			if size == 0 {
+				break
+			}
+			offset := binary.LittleEndian.Uint16(b[i+2 : i+4])
+			slotArray = append(slotArray, Slot{offset, size})
+		}
+
+		p = &Page{numEntries, startFreeSpace, endFreeSpace, slotArray}
+	}
+
+	slot := p.slotArray[r.currSlot]
+	b := make([]byte, slot.size)
+	byteOffsetInFile := pageStartOffset + int64(slot.offset)
+	_, err := r.heapFile.file.ReadAt(b, byteOffsetInFile)
+	if err != nil {
+		return nil
+	}
+	return b
 }
 
 type PredFn func(row) bool

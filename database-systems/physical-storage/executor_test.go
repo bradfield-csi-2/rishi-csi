@@ -1,6 +1,9 @@
 package main
 
-import "testing"
+import (
+	"fmt"
+	"testing"
+)
 
 func TestLimit(t *testing.T) {
 	lim := 5
@@ -134,4 +137,8 @@ func TestReadWrite(t *testing.T) {
 	wr := newWriter("movies_db")
 	r := row{"title": "Toy Story", "year": "1995"}
 	wr.Write(r)
+
+	rd := newReader("movies_db")
+	m := rd.Read()
+	fmt.Printf("Read: %s\n", string(m))
 }
