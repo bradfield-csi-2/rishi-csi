@@ -129,3 +129,9 @@ func TestSortMultipleCols(t *testing.T) {
 		)
 	}
 }
+
+func TestReadWrite(t *testing.T) {
+	wr := newWriter("movies_db")
+	r := row{"title": "Toy Story", "year": "1995"}
+	wr.Write(r)
+}

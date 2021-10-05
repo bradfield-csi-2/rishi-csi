@@ -1,6 +1,8 @@
 package main
 
 import (
+	"bytes"
+	"encoding/binary"
 	"encoding/csv"
 	"fmt"
 	"os"
@@ -43,6 +45,108 @@ type SeqScanNode struct {
 	nRows  int
 	cursor int
 	child  Node
+}
+
+// Each relation is stored in one file (more or less), as an array of pages
+// that are of the size block_size (usually 8kb)
+
+// Build up an array of Pages and write out the file
+// Pages contain records
+// Need a separate schema file
+// When writing,
+
+type Writer struct {
+	heapFile *HeapFile
+	relation string
+}
+
+type HeapFile struct {
+	file     *os.File
+	pages    []*Page
+	numPages int64
+}
+
+// 8 kb pages
+type Page struct {
+	numEntries     uint16
+	startFreeSpace uint16
+	endFreeSpace   uint16
+	slotArray      []Slot
+}
+
+type Slot struct {
+	size   uint16
+	offset uint16
+}
+
+func newWriter(relName string) *Writer {
+	// TODO: Check if file exists before creating
+	f, err := os.Create(relName)
+	if err != nil {
+		return nil
+	}
+
+	h := newHeapFile(f)
+	return &Writer{heapFile: h, relation: relName}
+}
+
+func newHeapFile(f *os.File) *HeapFile {
+	return &HeapFile{file: f, pages: []*Page{newPage()}, numPages: 1}
+}
+
+func newPage() *Page {
+	return &Page{
+		numEntries:     0,
+		startFreeSpace: 6,
+		endFreeSpace:   0xffff,
+		slotArray:      make([]Slot, 0),
+	}
+}
+
+var PAGE_SIZE int64 = 0xffff
+
+func (w *Writer) Write(r row) {
+	p := w.heapFile.pages[w.heapFile.numPages-1]
+	freeSpace := p.endFreeSpace - p.startFreeSpace
+
+	rowBytes := make([]byte, 0)
+	for _, v := range r {
+		rowBytes = append(rowBytes, []byte(v)...)
+	}
+	rowSize := uint16(len(rowBytes))
+
+	if freeSpace < rowSize {
+		// Add a new page
+		p = newPage()
+		w.heapFile.numPages += 1
+		w.heapFile.pages = append(w.heapFile.pages, p)
+	}
+
+	p.numEntries++
+	slot := Slot{size: rowSize, offset: p.endFreeSpace - rowSize}
+
+	p.startFreeSpace += 4 // New slot array entry is four bytes
+	p.endFreeSpace -= rowSize
+
+	// Will append to the slot array -- not handling deletes right now
+	p.slotArray = append(p.slotArray, slot)
+
+	buf := new(bytes.Buffer)
+	binary.Write(buf, binary.LittleEndian, p.numEntries)
+	binary.Write(buf, binary.LittleEndian, p.startFreeSpace)
+	binary.Write(buf, binary.LittleEndian, p.endFreeSpace)
+	for _, s := range p.slotArray {
+		binary.Write(buf, binary.LittleEndian, s.size)
+		binary.Write(buf, binary.LittleEndian, s.offset)
+	}
+	headerBytes := buf.Bytes()
+
+	// Now flush this page back to disk
+	pageStartOffset := (w.heapFile.numPages - 1) * PAGE_SIZE
+	byteOffsetInFile := pageStartOffset + int64(p.endFreeSpace)
+
+	w.heapFile.file.WriteAt(headerBytes, pageStartOffset)
+	w.heapFile.file.WriteAt(rowBytes, byteOffsetInFile)
 }
 
 type PredFn func(row) bool
