@@ -16,13 +16,14 @@ type Reader struct {
 	relation    string
 	currPage    *Page
 	currPageNum int64
-	currSlot    int
+	currSlot    uint16
 }
 
 type HeapFile struct {
 	file     *os.File
 	pages    []*Page
 	numPages int64
+	fields   []string
 }
 
 // 8 kb pages
@@ -31,6 +32,7 @@ type Page struct {
 	startFreeSpace uint16
 	endFreeSpace   uint16
 	slotArray      []Slot
+	tuples         []map[string]string
 }
 
 type Slot struct {
@@ -38,24 +40,24 @@ type Slot struct {
 	offset uint16
 }
 
-func newWriter(relName string) *Writer {
+func newWriter(relName string, fields []string) *Writer {
 	// TODO: Check if file exists before creating
 	f, err := os.Create(relName)
 	if err != nil {
 		return nil
 	}
 
-	h := newHeapFile(f)
+	h := newHeapFile(f, fields)
 	return &Writer{heapFile: h, relation: relName}
 }
 
-func newReader(relName string) *Reader {
+func newReader(relName string, fields []string) *Reader {
 	f, err := os.Open(relName)
 	if err != nil {
 		return nil
 	}
 
-	h := newHeapFile(f)
+	h := newHeapFile(f, fields)
 	return &Reader{
 		heapFile:    h,
 		relation:    relName,
@@ -65,30 +67,51 @@ func newReader(relName string) *Reader {
 	}
 }
 
-func newHeapFile(f *os.File) *HeapFile {
-	return &HeapFile{file: f, pages: []*Page{newPage()}, numPages: 1}
+func newHeapFile(f *os.File, fields []string) *HeapFile {
+	return &HeapFile{
+		file:     f,
+		pages:    []*Page{newPage()},
+		numPages: 1,
+		fields:   fields,
+	}
 }
+
+var PAGE_SIZE int64 = 0xffff
+var NULL_BYTE uint32 = 0x00
 
 func newPage() *Page {
 	return &Page{
 		numEntries:     0,
 		startFreeSpace: 6,
-		endFreeSpace:   0xffff,
+		endFreeSpace:   uint16(PAGE_SIZE),
 		slotArray:      make([]Slot, 0),
+		tuples:         make([]map[string]string, 0),
 	}
 }
-
-var PAGE_SIZE int64 = 0xffff
 
 func (w *Writer) Write(r row) {
 	p := w.heapFile.pages[w.heapFile.numPages-1]
 	freeSpace := p.endFreeSpace - p.startFreeSpace
 
-	rowBytes := make([]byte, 0)
-	for _, v := range r {
-		rowBytes = append(rowBytes, []byte(v)...)
+	tupleHeaderLen := len(w.heapFile.fields) * 4
+	buf := new(bytes.Buffer)
+	offset := uint16(tupleHeaderLen)
+	tupleData := make([]byte, 0)
+	for _, field := range w.heapFile.fields {
+		if val, ok := r[field]; ok {
+			size := uint16(len(val))
+			binary.Write(buf, binary.LittleEndian, offset)
+			binary.Write(buf, binary.LittleEndian, size)
+			tupleData = append(tupleData, []byte(val)...)
+			offset += size
+		} else {
+			// Write a zero byte for null fields
+			binary.Write(buf, binary.LittleEndian, NULL_BYTE)
+		}
 	}
-	rowSize := uint16(len(rowBytes))
+	buf.Write(tupleData)
+	tuple := buf.Bytes()
+	rowSize := uint16(len(tuple))
 
 	if freeSpace < rowSize {
 		// Add a new page
@@ -106,7 +129,7 @@ func (w *Writer) Write(r row) {
 	// Will append to the slot array -- not handling deletes right now
 	p.slotArray = append(p.slotArray, slot)
 
-	buf := new(bytes.Buffer)
+	buf = new(bytes.Buffer)
 	binary.Write(buf, binary.LittleEndian, p.numEntries)
 	binary.Write(buf, binary.LittleEndian, p.startFreeSpace)
 	binary.Write(buf, binary.LittleEndian, p.endFreeSpace)
@@ -121,45 +144,72 @@ func (w *Writer) Write(r row) {
 	byteOffsetInFile := pageStartOffset + int64(p.endFreeSpace)
 
 	w.heapFile.file.WriteAt(headerBytes, pageStartOffset)
-	w.heapFile.file.WriteAt(rowBytes, byteOffsetInFile)
+	w.heapFile.file.WriteAt(tuple, byteOffsetInFile)
 }
 
-func (r *Reader) Read() []byte {
+func (r *Reader) Read() map[string]string {
 	p := r.currPage
-	pageStartOffset := r.currPageNum * PAGE_SIZE
 
-	// If page is empty, read it into memory
+	// If the page is empty, read it into memory
 	if p == nil {
-		b := make([]byte, PAGE_SIZE)
-		_, err := r.heapFile.file.ReadAt(b, pageStartOffset)
-		if err != nil {
-			return nil
-		}
-		numEntries := binary.LittleEndian.Uint16(b[0:2])
-		startFreeSpace := binary.LittleEndian.Uint16(b[2:4])
-		endFreeSpace := binary.LittleEndian.Uint16(b[4:6])
-		slotArray := make([]Slot, 0)
-		for i := 6; i < len(b); i += 4 {
-			size := binary.LittleEndian.Uint16(b[i : i+2])
-			if size == 0 {
-				break
-			}
-			offset := binary.LittleEndian.Uint16(b[i+2 : i+4])
-			slotArray = append(slotArray, Slot{offset, size})
-		}
-
-		p = &Page{numEntries, startFreeSpace, endFreeSpace, slotArray}
-		// Need to load tuples into memory
-		// The tuple array is indexed the same as the slot array,
-		// So build back to front
+		p = r.LoadPage()
+		r.currPage = p
 	}
 
-	slot := p.slotArray[r.currSlot]
-	b := make([]byte, slot.size)
-	byteOffsetInFile := pageStartOffset + int64(slot.offset)
-	_, err := r.heapFile.file.ReadAt(b, byteOffsetInFile)
+	// Read the tuple from the page in memory and increment the slot for the next
+	// call to Read()
+	b := p.tuples[r.currSlot]
+	r.currSlot++
+
+	// If we have read the entire page, tick over to the next one. The next call
+	// to Read() will load the page into memory
+	if r.currSlot >= p.numEntries {
+		r.currPage = nil
+		r.currPageNum++
+		r.currSlot = 0
+	}
+
+	return b
+}
+
+func (r *Reader) LoadPage() *Page {
+	pageStartOffset := r.currPageNum * PAGE_SIZE
+	b := make([]byte, PAGE_SIZE)
+	f := r.heapFile.file
+	_, err := f.ReadAt(b, pageStartOffset)
 	if err != nil {
 		return nil
 	}
-	return b
+	numEntries := binary.LittleEndian.Uint16(b[0:2])
+	startFreeSpace := binary.LittleEndian.Uint16(b[2:4])
+	endFreeSpace := binary.LittleEndian.Uint16(b[4:6])
+	slotArray := make([]Slot, 0)
+	tuples := make([]map[string]string, 0)
+	for i := 6; i < len(b); i += 4 {
+		size := binary.LittleEndian.Uint16(b[i : i+2])
+		if size == 0 {
+			break
+		}
+		offset := binary.LittleEndian.Uint16(b[i+2 : i+4])
+		slotArray = append(slotArray, Slot{offset, size})
+		tuples = append(tuples, r.LoadTuple(b[offset:offset+size]))
+	}
+
+	return &Page{numEntries, startFreeSpace, endFreeSpace, slotArray, tuples}
+}
+
+func (r *Reader) LoadTuple(bytes []byte) map[string]string {
+	tuple := make(map[string]string)
+	fields := r.heapFile.fields
+	for i := 0; i < len(fields); i++ {
+		start := i * 4
+		offset := binary.LittleEndian.Uint16(bytes[start : start+2])
+		size := binary.LittleEndian.Uint16(bytes[start+2 : start+4])
+		fieldName := fields[i]
+		if size > 0 {
+			value := bytes[offset : offset+size]
+			tuple[fieldName] = string(value)
+		}
+	}
+	return tuple
 }

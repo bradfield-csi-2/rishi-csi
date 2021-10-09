@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"testing"
 )
 
@@ -134,11 +133,30 @@ func TestSortMultipleCols(t *testing.T) {
 }
 
 func TestReadWrite(t *testing.T) {
-	wr := newWriter("movies_db")
-	r := row{"title": "Toy Story", "year": "1995"}
-	wr.Write(r)
+	fields := []string{"id", "title"}
+	wr := newWriter("movies_db", fields)
+	r1 := row{"title": "Toy Story (1995)", "id": "1"}
+	r2 := row{"title": "Jumanji (1995)", "id": "2"}
+	wr.Write(r1)
+	wr.Write(r2)
 
-	rd := newReader("movies_db")
-	m := rd.Read()
-	fmt.Printf("Read: %s\n", string(m))
+	rd := newReader("movies_db", fields)
+	m1 := rd.Read()
+	if m1["title"] != "Toy Story (1995)" {
+		t.Fatalf(
+			"Write(%v) then Read()\nGOT %s, WANT %s\n",
+			r1,
+			m1["title"],
+			"1Toy Story (1995)",
+		)
+	}
+	m2 := rd.Read()
+	if m2["title"] != "Jumanji (1995)" {
+		t.Fatalf(
+			"Write(%v) then Read()\nGOT %s, WANT %s\n",
+			r2,
+			m2["title"],
+			"Jumanji (1995)",
+		)
+	}
 }
