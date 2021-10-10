@@ -1,6 +1,10 @@
 package main
 
 import (
+	"encoding/csv"
+	"fmt"
+	"io"
+	"os"
 	"testing"
 )
 
@@ -158,5 +162,40 @@ func TestReadWrite(t *testing.T) {
 			m2["title"],
 			"Jumanji (1995)",
 		)
+	}
+}
+
+func TestBulkReadWrite(t *testing.T) {
+	fields := []string{"id", "title", "genres"}
+	wr := newWriter("movies_db", fields)
+	rd := newReader("movies_db", fields)
+
+	f, _ := os.Open("data/movies.csv")
+	r := csv.NewReader(f)
+	r.Read() // Skip header
+	for {
+		record, err := r.Read()
+		if err == io.EOF {
+			break
+		}
+
+		if err != nil {
+			t.Fatalf("Error reading movie data\n")
+		}
+
+		tuple := make(map[string]string)
+		for i, val := range record {
+			tuple[fields[i]] = val
+		}
+		wr.Write(tuple)
+	}
+
+	fmt.Printf("Num Pages: %d\n", wr.heapFile.numPages)
+	rec := rd.Read()
+	for rec != nil {
+		if rd.currPageNum == 5 {
+			fmt.Printf("%v\n", rec)
+		}
+		rec = rd.Read()
 	}
 }

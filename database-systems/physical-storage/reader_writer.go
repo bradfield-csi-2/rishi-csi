@@ -105,7 +105,7 @@ func (w *Writer) Write(r row) {
 			tupleData = append(tupleData, []byte(val)...)
 			offset += size
 		} else {
-			// Write a zero byte for null fields
+			// Write a zero four bytes for null fields
 			binary.Write(buf, binary.LittleEndian, NULL_BYTE)
 		}
 	}
@@ -113,7 +113,7 @@ func (w *Writer) Write(r row) {
 	tuple := buf.Bytes()
 	rowSize := uint16(len(tuple))
 
-	if freeSpace < rowSize {
+	if (freeSpace - 4) <= rowSize {
 		// Add a new page
 		p = newPage()
 		w.heapFile.numPages += 1
@@ -153,6 +153,9 @@ func (r *Reader) Read() map[string]string {
 	// If the page is empty, read it into memory
 	if p == nil {
 		p = r.LoadPage()
+		if p == nil {
+			return nil
+		}
 		r.currPage = p
 	}
 
@@ -206,7 +209,7 @@ func (r *Reader) LoadTuple(bytes []byte) map[string]string {
 		offset := binary.LittleEndian.Uint16(bytes[start : start+2])
 		size := binary.LittleEndian.Uint16(bytes[start+2 : start+4])
 		fieldName := fields[i]
-		if size > 0 {
+		if offset > 0 {
 			value := bytes[offset : offset+size]
 			tuple[fieldName] = string(value)
 		}
