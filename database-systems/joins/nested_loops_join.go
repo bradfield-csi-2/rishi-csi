@@ -4,7 +4,6 @@ type NestedLoopsJoinOperator struct {
 	outerChild Operator
 	innerChild Operator
 	key        string
-	column     string
 	results    []Tuple
 	idx        int
 }
@@ -43,21 +42,4 @@ func (n *NestedLoopsJoinOperator) Next() bool {
 
 func (n *NestedLoopsJoinOperator) Execute() Tuple {
 	return n.results[n.idx]
-}
-
-func combineTuples(a, b Tuple) Tuple {
-	vals := []Value{}
-	for _, v := range append(a.Values, b.Values...) {
-		vals = append(vals, v)
-	}
-	return Tuple{Values: vals}
-}
-
-func getVal(tuple Tuple, col string) string {
-	for _, v := range tuple.Values {
-		if v.Name == col {
-			return v.StringValue
-		}
-	}
-	return ""
 }

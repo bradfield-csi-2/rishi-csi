@@ -21,3 +21,20 @@ type Value struct {
 	Name        string
 	StringValue string
 }
+
+func combineTuples(a, b Tuple) Tuple {
+	vals := []Value{}
+	for _, v := range append(a.Values, b.Values...) {
+		vals = append(vals, v)
+	}
+	return Tuple{Values: vals}
+}
+
+func getVal(tuple Tuple, col string) string {
+	for _, v := range tuple.Values {
+		if v.Name == col {
+			return v.StringValue
+		}
+	}
+	return ""
+}
