@@ -18,6 +18,10 @@ func NewSelectionOperator(exp BinaryExpression, child Operator) Operator {
 	}
 }
 
+func (f *SelectionOperator) Init() {
+	return
+}
+
 // Next returns a boolean indicating whether the SelectionOperator has an additional value.
 //
 // Note that calling Next() once on the SelectionOperator may consume an arbitrary number

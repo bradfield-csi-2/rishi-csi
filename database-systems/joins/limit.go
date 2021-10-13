@@ -19,6 +19,10 @@ func NewLimitOperator(limit int, child Operator) Operator {
 	}
 }
 
+func (l *LimitOperator) Init() {
+	return
+}
+
 // Next returns whether the the LimitOperator has another value to return.
 func (l *LimitOperator) Next() bool {
 	hasNext := l.numReturned < l.limit && l.child.Next()

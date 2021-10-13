@@ -14,6 +14,10 @@ func NewScanOperator(tuples []Tuple) Operator {
 	}
 }
 
+func (s *ScanOperator) Init() {
+	s.idx = -1
+}
+
 // Next returns a boolean indicating whether there are more tuples to scan.
 func (s *ScanOperator) Next() bool {
 	s.idx++

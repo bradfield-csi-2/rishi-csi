@@ -2,6 +2,8 @@ package main
 
 // Operator is the interface implemented by all operators.
 type Operator interface {
+	// Init intializes the operator  in preparation for calling Next/Execute
+	Init()
 	// Next returns a boolean indicating whether the operator has more work to do.
 	Next() bool
 	// Execute executes the operation and returns the resulting tuple. Should only

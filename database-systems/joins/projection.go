@@ -14,6 +14,10 @@ func NewProjectionOperator(fields map[string]struct{}, child Operator) Operator 
 	}
 }
 
+func (s *ProjectionOperator) Init() {
+	return
+}
+
 // Next returns a boolean indicating whether there are more tuples to select.
 func (s *ProjectionOperator) Next() bool {
 	return s.child.Next()
