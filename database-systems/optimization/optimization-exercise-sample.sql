@@ -40,7 +40,7 @@ begin
     );
 
     /* create an index on employee salary */
-    create index employee_manager_salary on employee (manager_id);
+    create index employee_salary on employee (manager_id);
 --    create index employee_salary on employee (salary);
 --    create index employee_salary_dep on employee (salary, dep_id);
 --    create index employee_manager_salary on employee (manager_id, salary);
@@ -81,11 +81,12 @@ $$ language plpgsql;
 
 /* rebuild test data: comment this out to use existing data set */
 \t on
-select rebuild();
+select 1;--rebuild();
 \t off
 
+
 /* average employee salary... note what happens when we have 3-4x the number of employees */
-explain select count(*), avg(salary) from employee;
+--explain select count(*), avg(salary) from employee;
 
 /* top salaries in sales... note what indexes would help here? */
 --explain select * from employee where employee.dep_id = 1 order by employee.salary limit 10;
@@ -105,6 +106,9 @@ explain select count(*), avg(salary) from employee;
 -- limit 10;
 
 /* see some stats */
-select histogram_bounds
-from pg_stats
-where tablename='employee' and attname='salary';
+-- select histogram_bounds
+-- from pg_stats
+-- where tablename='employee' and attname='salary';
+
+/* Query 1: Total bonus for each employee */
+explain select emp_id, sum(amount) from bonus group by 1;
