@@ -2,7 +2,9 @@ package main
 
 import (
 	"bufio"
+	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"os/signal"
 	"strings"
@@ -23,6 +25,7 @@ const (
 )
 
 var store map[string]string
+var storeFile *os.File
 
 func HandleInt() {
 	c := make(chan os.Signal, 1)
@@ -67,20 +70,51 @@ func ExecuteCommand(cmd *Command) (string, error) {
 		if val, ok := store[cmd.key]; ok {
 			return val, nil
 		} else {
-			return "", fmt.Errorf("Key '%s' not found", cmd.key)
+			return "", fmt.Errorf("key '%s' not found", cmd.key)
 		}
 	case Set:
 		store[cmd.key] = cmd.value
+		jsonData, err := json.Marshal(store)
+		if err != nil {
+			return "", fmt.Errorf("Error marshaling JSON")
+		}
+		storeFile.WriteAt(jsonData, 0)
 		return fmt.Sprintf("Set key '%s' to '%s'", cmd.key, cmd.value), nil
 	default:
 		return "", fmt.Errorf("Invalid Operation: %v", op)
 	}
 }
 
+func SetupStore() *os.File {
+	store = make(map[string]string)
+	f, err := os.OpenFile("store.json", os.O_RDWR|os.O_CREATE, 0644)
+	if err != nil {
+		fmt.Println("Error opening data store")
+		os.Exit(1)
+	}
+	bytes, err := io.ReadAll(f)
+	if err != nil {
+		fmt.Println("Error reading data store")
+		os.Exit(1)
+	}
+	var out map[string]interface{}
+	err = json.Unmarshal(bytes, &out)
+	if err != nil {
+		fmt.Println("Error unmarshaling JSON data from store")
+		os.Exit(1)
+	}
+
+	for k, v := range out {
+		store[k] = v.(string)
+	}
+	return f
+}
+
 func main() {
 	reader := bufio.NewReader(os.Stdin)
-	store = make(map[string]string)
 	HandleInt()
+	storeFile = SetupStore()
+	defer storeFile.Close()
 
 	for {
 		fmt.Printf("dkvs> ")
