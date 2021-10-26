@@ -5,10 +5,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"net"
 	"os"
-	"os/signal"
 	"strings"
-	"syscall"
 )
 
 type Op int
@@ -23,18 +22,38 @@ const (
 	Get Op = iota
 	Set
 )
+const SockAddr = "/tmp/dkvs.sock"
 
 var store map[string]string
 var storeFile *os.File
 
-func HandleInt() {
-	c := make(chan os.Signal, 1)
-	signal.Notify(c, syscall.SIGINT, syscall.SIGTERM)
-	go func() {
-		<-c
-		fmt.Println("\nExiting. Bye!")
-		os.Exit(0)
-	}()
+func SetupStore() *os.File {
+	store = make(map[string]string)
+	f, err := os.OpenFile("store.json", os.O_RDWR|os.O_CREATE, 0644)
+	if err != nil {
+		fmt.Println("Error opening data store")
+		os.Exit(1)
+	}
+	bytes, err := io.ReadAll(f)
+	if err != nil {
+		fmt.Println("Error reading data store")
+		os.Exit(1)
+	}
+	if len(bytes) == 0 {
+		return f
+	}
+
+	var out map[string]interface{}
+	err = json.Unmarshal(bytes, &out)
+	if err != nil {
+		fmt.Println("Error unmarshaling JSON data from store")
+		os.Exit(1)
+	}
+
+	for k, v := range out {
+		store[k] = v.(string)
+	}
+	return f
 }
 
 func ParseCommand(cmd string) (*Command, error) {
@@ -85,54 +104,50 @@ func ExecuteCommand(cmd *Command) (string, error) {
 	}
 }
 
-func SetupStore() *os.File {
-	store = make(map[string]string)
-	f, err := os.OpenFile("store.json", os.O_RDWR|os.O_CREATE, 0644)
-	if err != nil {
-		fmt.Println("Error opening data store")
-		os.Exit(1)
-	}
-	bytes, err := io.ReadAll(f)
-	if err != nil {
-		fmt.Println("Error reading data store")
-		os.Exit(1)
-	}
-	var out map[string]interface{}
-	err = json.Unmarshal(bytes, &out)
-	if err != nil {
-		fmt.Println("Error unmarshaling JSON data from store")
-		os.Exit(1)
-	}
-
-	for k, v := range out {
-		store[k] = v.(string)
-	}
-	return f
-}
-
-func main() {
-	reader := bufio.NewReader(os.Stdin)
-	HandleInt()
-	storeFile = SetupStore()
-	defer storeFile.Close()
-
+func handleConnection(conn net.Conn) {
 	for {
-		fmt.Printf("dkvs> ")
-		line, err := reader.ReadString('\n')
+		line, err := bufio.NewReader(conn).ReadString('\n')
 		if err != nil {
-			fmt.Println("Error reading input")
-			continue
+			fmt.Printf("Error reading command: %s", err)
+			os.Exit(1)
 		}
 		cmd, err := ParseCommand(line)
 		if err != nil {
-			fmt.Println(err.Error())
+			conn.Write([]byte(err.Error() + "\n"))
 			continue
 		}
 		result, err := ExecuteCommand(cmd)
 		if err != nil {
-			fmt.Println(err.Error())
+			conn.Write([]byte(err.Error() + "\n"))
 			continue
 		}
-		fmt.Println(result)
+		conn.Write([]byte(result + "\n"))
+	}
+	conn.Close()
+}
+
+func main() {
+	storeFile = SetupStore()
+	defer storeFile.Close()
+
+	if err := os.RemoveAll(SockAddr); err != nil {
+		fmt.Printf("Error cleaning up sockets")
+		os.Exit(1)
+	}
+
+	l, err := net.Listen("unix", SockAddr)
+	if err != nil {
+		fmt.Printf("Error listening on socket")
+		os.Exit(1)
+	}
+	defer l.Close()
+
+	for {
+		conn, err := l.Accept()
+		if err != nil {
+			fmt.Printf("Error accepting connection: %s", err)
+			os.Exit(1)
+		}
+		go handleConnection(conn)
 	}
 }
