@@ -1,0 +1,29 @@
+syntax = "proto3";
+package main;
+
+option go_package = "./dkvspb";
+
+message Pair {
+  string key = 1;
+  string value = 2;
+}
+
+message Request {
+  enum Op {
+    GET = 0;
+    SET = 1;
+  }
+
+  Op op = 1;
+  Pair pair = 2;
+}
+
+message Response {
+  enum Status {
+    OK = 0;
+    ERROR = 1;
+  }
+
+  Status status = 1;
+  string message = 2;
+}

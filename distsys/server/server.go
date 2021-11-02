@@ -1,13 +1,15 @@
 package main
 
 import (
-	"bufio"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net"
 	"os"
-	"strings"
+
+	pb "dkvs/dkvspb"
+
+	"google.golang.org/protobuf/proto"
 )
 
 type Op int
@@ -56,72 +58,62 @@ func SetupStore() *os.File {
 	return f
 }
 
-func ParseCommand(cmd string) (*Command, error) {
-	cmd = strings.TrimSpace(cmd)
-	i := strings.Index(cmd, " ")
-	if i < 0 {
-		return nil, fmt.Errorf("Invalid command: not enough arguments")
-	}
+func ExecuteCommand(req *pb.Request) *pb.Response {
+	resp := &pb.Response{}
 
-	op := strings.ToLower(cmd[0:i])
-	args := cmd[i+1:]
-	command := &Command{}
-	if op == "get" {
-		command.op = Get
-		command.key = args
-	} else if op == "set" {
-		command.op = Set
-		parts := strings.Split(args, "=")
-		if len(parts) != 2 {
-			return nil, fmt.Errorf("Invalid command: must provide 'key=value' for set")
-		}
-		command.key = parts[0]
-		command.value = parts[1]
-	} else {
-		return nil, fmt.Errorf("Invalid command: unknown operation")
-	}
-	return command, nil
-}
-
-func ExecuteCommand(cmd *Command) (string, error) {
-	switch op := cmd.op; op {
-	case Get:
-		if val, ok := store[cmd.key]; ok {
-			return val, nil
+	switch op := req.Op; op {
+	case pb.Request_GET:
+		if val, ok := store[req.Pair.Key]; ok {
+			resp.Status = pb.Response_OK
+			resp.Message = val
+			return resp
 		} else {
-			return "", fmt.Errorf("key '%s' not found", cmd.key)
+			msg := fmt.Sprintf("key '%s' not found", req.Pair.Key)
+			resp.Status = pb.Response_ERROR
+			resp.Message = msg
+			return resp
 		}
-	case Set:
-		store[cmd.key] = cmd.value
+	case pb.Request_SET:
+		store[req.Pair.Key] = req.Pair.Value
 		jsonData, err := json.Marshal(store)
 		if err != nil {
-			return "", fmt.Errorf("Error marshaling JSON")
+			msg := "Error marshaling JSON"
+			resp.Status = pb.Response_ERROR
+			resp.Message = msg
+			return resp
 		}
 		storeFile.WriteAt(jsonData, 0)
-		return fmt.Sprintf("Set key '%s' to '%s'", cmd.key, cmd.value), nil
+		msg := fmt.Sprintf("Set key '%s' to '%s'", req.Pair.Key, req.Pair.Value)
+		resp.Status = pb.Response_OK
+		resp.Message = msg
+		return resp
 	default:
-		return "", fmt.Errorf("Invalid Operation: %v", op)
+		msg := fmt.Sprintf("Invalid Operation: %v", op)
+		resp.Status = pb.Response_ERROR
+		resp.Message = msg
+		return resp
 	}
 }
 
 func handleConnection(conn net.Conn) {
 	for {
-		line, err := bufio.NewReader(conn).ReadString('\n')
+		buf := make([]byte, 1024)
+		n, err := conn.Read(buf)
+		buf = buf[:n]
+		req := &pb.Request{}
+		fmt.Printf("%+ x\n", buf)
+		err = proto.Unmarshal(buf, req)
 		if err != nil {
-			fmt.Printf("Error reading command: %s", err)
+			fmt.Printf("Error unmarshaling proto: %s", err)
 			os.Exit(1)
 		}
-		cmd, err := ParseCommand(line)
+		response := ExecuteCommand(req)
+		out, err := proto.Marshal(response)
 		if err != nil {
-			conn.Write([]byte(err.Error() + "\n"))
+			fmt.Println("Error marshaling response proto")
 			continue
 		}
-		result, err := ExecuteCommand(cmd)
-		if err != nil {
-			conn.Write([]byte(err.Error() + "\n"))
-			continue
-		}
-		conn.Write([]byte(result + "\n"))
+		conn.Write(out)
 	}
 	conn.Close()
 }
