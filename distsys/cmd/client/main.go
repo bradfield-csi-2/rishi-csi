@@ -9,7 +9,7 @@ import (
 	"strings"
 	"syscall"
 
-	pb "dkvs/dkvspb"
+	pb "dkvs/command"
 
 	"google.golang.org/protobuf/proto"
 )
@@ -55,27 +55,34 @@ func ParseRequest(cmd string) (*pb.Request, error) {
 	return req, nil
 }
 
+func ReadInput() (string, error) {
+	reader := bufio.NewReader(os.Stdin)
+	fmt.Printf("dkvs> ")
+	return reader.ReadString('\n')
+}
+
 func main() {
 	HandleInt()
 
-	conn, err := net.Dial("unix", SockAddr)
+	conn, err := net.Dial("tcp", "localhost:8000")
 	if err != nil {
 		fmt.Printf("Error connecting to server: %s\n", err)
+		os.Exit(1)
 	}
 
 	for {
-		reader := bufio.NewReader(os.Stdin)
-		fmt.Printf("dkvs> ")
-		line, err := reader.ReadString('\n')
+		line, err := ReadInput()
 		if err != nil {
 			fmt.Println("Error reading input")
 			continue
 		}
+
 		req, err := ParseRequest(line)
 		if err != nil {
 			fmt.Println("Error parsing request")
 			continue
 		}
+
 		out, err := proto.Marshal(req)
 		conn.Write(out)
 		buf := make([]byte, 1024)
